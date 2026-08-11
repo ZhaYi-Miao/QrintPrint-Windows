@@ -1,0 +1,65 @@
+<Window x:Class="QrintPrint.Views.DevicePickerDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="选择打印机"
+        Height="500" Width="420"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Background="{DynamicResource Layer01Brush}">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Style="{StaticResource SubtitleText}"
+                   Text="选择 Qring 打印机" />
+        <TextBlock Grid.Row="1" Margin="0,4,0,16"
+                   Style="{StaticResource CaptionText}"
+                   Text="只展示名字以 Qring 开头的设备" />
+
+        <Border Grid.Row="2"
+                BorderBrush="{DynamicResource ControlStrokeBrush}"
+                BorderThickness="1"
+                CornerRadius="6">
+            <Grid>
+                <ListBox x:Name="DeviceList"
+                         Background="Transparent"
+                         BorderThickness="0"
+                         Padding="2"
+                         SelectionChanged="DeviceList_SelectionChanged">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="6,8">
+                                <TextBlock Text="{Binding Name}" Style="{StaticResource BodyStrongText}" />
+                                <TextBlock Text="{Binding Subtitle}" Style="{StaticResource CaptionText}" Margin="0,2,0,0" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+                <TextBlock x:Name="EmptyHint" Visibility="Collapsed"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                           Style="{StaticResource CaptionText}"
+                           Text="未发现 Qring 设备" />
+            </Grid>
+        </Border>
+
+        <StackPanel Grid.Row="3" Orientation="Horizontal"
+                    HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button x:Name="ScanBtn" Padding="16,8" Margin="0,0,8,0"
+                    Click="ScanBtn_Click" Content="扫描" />
+            <Button x:Name="ConnectBtn" Padding="16,8" Margin="0,0,8,0"
+                    IsEnabled="False"
+                    Click="ConnectBtn_Click" Content="连接" />
+            <Button Padding="16,8" IsCancel="True" Content="取消" />
+        </StackPanel>
+
+        <TextBlock x:Name="StatusHint" Grid.Row="0" Grid.RowSpan="4"
+                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                   Style="{StaticResource BodyText}"
+                   Visibility="Collapsed" />
+    </Grid>
+</Window>

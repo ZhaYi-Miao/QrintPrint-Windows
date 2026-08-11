@@ -1,0 +1,74 @@
+<UserControl x:Class="QrintPrint.Views.Pages.HistoryPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <DockPanel>
+            <!-- 顶部操作栏 -->
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,16">
+                <TextBlock Style="{StaticResource SubtitleText}" Text="打印历史" VerticalAlignment="Center" />
+                <Button Margin="16,0,0,0" Padding="12,8"
+                        Click="ClearBtn_Click" Content="清空历史" />
+            </StackPanel>
+
+            <!-- 历史记录列表 -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ItemsControl x:Name="HistoryList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Margin="0,0,0,8" Padding="16"
+                                    Background="{DynamicResource Layer02Brush}"
+                                    BorderBrush="{DynamicResource ControlStrokeBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="8">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="120" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- 缩略图 -->
+                                    <Border Grid.Column="0" Margin="0,0,16,0"
+                                            Background="White"
+                                            BorderBrush="{DynamicResource ControlStrokeBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="4">
+                                        <Image Source="{Binding Thumbnail}"
+                                               Stretch="Uniform"
+                                               Width="100" Height="100" />
+                                    </Border>
+
+                                    <!-- 信息 -->
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Style="{StaticResource BodyStrongText}"
+                                                   Text="{Binding Title}" />
+                                        <TextBlock Margin="0,4,0,0" Style="{StaticResource CaptionText}"
+                                                   Text="{Binding Detail}" />
+                                        <TextBlock Margin="0,2,0,0" Style="{StaticResource CaptionText}"
+                                                   Text="{Binding TimeText}" />
+                                    </StackPanel>
+
+                                    <!-- 操作按钮 -->
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Button Padding="12,8" Margin="0,0,8,0"
+                                                Click="ReprintBtn_Click"
+                                                Tag="{Binding}"
+                                                Content="重新打印" />
+                                        <Button Padding="12,8"
+                                                Click="DeleteBtn_Click"
+                                                Tag="{Binding}"
+                                                Content="删除" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </DockPanel>
+    </Grid>
+</UserControl>

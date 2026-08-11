@@ -1,0 +1,99 @@
+<UserControl x:Class="QrintPrint.Views.Pages.SettingsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="600" HorizontalAlignment="Left">
+            <!-- 设备信息 -->
+            <TextBlock Style="{StaticResource SubtitleText}" Text="设备信息" Margin="0,0,0,16" />
+            <Border Background="{DynamicResource Layer02Brush}"
+                    BorderBrush="{DynamicResource ControlStrokeBrush}"
+                    BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,0,0,24">
+                <StackPanel>
+                    <Grid Margin="0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="100" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Style="{StaticResource CaptionText}" Text="设备名称" />
+                        <TextBlock x:Name="DeviceNameValue" Grid.Column="1" Style="{StaticResource BodyText}" Text="—" />
+                    </Grid>
+                    <Grid Margin="0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="100" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Style="{StaticResource CaptionText}" Text="设备型号" />
+                        <TextBlock x:Name="DeviceModelValue" Grid.Column="1" Style="{StaticResource BodyText}" Text="—" />
+                    </Grid>
+                    <Grid Margin="0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="100" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Style="{StaticResource CaptionText}" Text="固件版本" />
+                        <TextBlock x:Name="FirmwareValue" Grid.Column="1" Style="{StaticResource BodyText}" Text="—" />
+                    </Grid>
+                    <Grid Margin="0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="100" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Style="{StaticResource CaptionText}" Text="连接状态" />
+                        <TextBlock x:Name="ConnStateValue" Grid.Column="1" Style="{StaticResource BodyText}" Text="未连接" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- 蓝牙设置 -->
+            <TextBlock Style="{StaticResource SubtitleText}" Text="蓝牙设置" Margin="0,0,0,16" />
+            <Border Background="{DynamicResource Layer02Brush}"
+                    BorderBrush="{DynamicResource ControlStrokeBrush}"
+                    BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,0,0,24">
+                <StackPanel>
+                    <CheckBox x:Name="AutoReconnectCheck" Content="自动重连上次设备"
+                              Margin="0,4" Checked="AutoReconnectCheck_Changed" Unchecked="AutoReconnectCheck_Changed" />
+                    <TextBlock Margin="0,4,0,0" Style="{StaticResource CaptionText}"
+                               Text="开启后，应用启动时会自动尝试连接上次使用的打印机" />
+
+                    <Button Margin="0,16,0,0" Padding="12,8" HorizontalAlignment="Left"
+                            Click="ForgetDeviceBtn_Click" Content="忘记当前设备" />
+                </StackPanel>
+            </Border>
+
+            <!-- 打印设置 -->
+            <TextBlock Style="{StaticResource SubtitleText}" Text="打印设置" Margin="0,0,0,16" />
+            <Border Background="{DynamicResource Layer02Brush}"
+                    BorderBrush="{DynamicResource ControlStrokeBrush}"
+                    BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,0,0,24">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource CaptionText}" Text="默认浓度" Margin="0,0,0,4" />
+                    <StackPanel Orientation="Horizontal">
+                        <Slider x:Name="DefaultThicknessSlider" Minimum="1" Maximum="5" Value="3"
+                                Width="200" TickFrequency="1" IsSnapToTickEnabled="True"
+                                ValueChanged="DefaultThicknessSlider_ValueChanged" />
+                        <TextBlock x:Name="DefaultThicknessLabel" Margin="8,0,0,0"
+                                   Style="{StaticResource BodyText}" Text="3" />
+                    </StackPanel>
+                    <TextBlock Margin="0,4,0,0" Style="{StaticResource CaptionText}"
+                               Text="设置新建打印任务时的默认浓度等级（1-5）" />
+                </StackPanel>
+            </Border>
+
+            <!-- 关于 -->
+            <TextBlock Style="{StaticResource SubtitleText}" Text="关于" Margin="0,0,0,16" />
+            <Border Background="{DynamicResource Layer02Brush}"
+                    BorderBrush="{DynamicResource ControlStrokeBrush}"
+                    BorderThickness="1" CornerRadius="8" Padding="16">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource BodyStrongText}" Text="QrintPrint" />
+                    <TextBlock Margin="0,4,0,0" Style="{StaticResource CaptionText}"
+                               Text="错题小印 Windows 版 v1.0.0" />
+                    <TextBlock Margin="0,8,0,0" Style="{StaticResource CaptionText}"
+                               Text="基于 Qring 私有协议，支持文本、照片、条码、自定义画布打印" />
+                    <TextBlock Margin="0,12,0,0" Style="{StaticResource CaptionText}"
+                               Text="ZhaYi &amp; DeepSeek" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

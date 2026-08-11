@@ -1,0 +1,23 @@
+# Build output
+bin/
+obj/
+dist/
+release/
+publish/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.cache
+*.log
+debug.log
+
+# NuGet
+packages/
+*.nupkg
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini

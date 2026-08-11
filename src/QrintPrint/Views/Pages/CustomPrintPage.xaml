@@ -1,0 +1,191 @@
+<UserControl x:Class="QrintPrint.Views.Pages.CustomPrintPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <UserControl.Resources>
+        <!-- 细滚动条样式 -->
+        <Style x:Key="ThinScrollBar" TargetType="ScrollBar">
+            <Setter Property="Width" Value="6"/>
+            <Setter Property="MinWidth" Value="6"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Style.Resources>
+                <Style TargetType="Track">
+                    <Setter Property="MinWidth" Value="6"/>
+                </Style>
+                <Style TargetType="Thumb">
+                    <Setter Property="MinWidth" Value="6"/>
+                    <Setter Property="MinHeight" Value="20"/>
+                </Style>
+            </Style.Resources>
+        </Style>
+        <Style x:Key="ThinScrollViewer" TargetType="ScrollViewer">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollViewer">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <ScrollContentPresenter Grid.Column="0" CanContentScroll="{TemplateBinding CanContentScroll}"
+                                                    Content="{TemplateBinding Content}"/>
+                            <ScrollBar Grid.Column="1" Name="PART_VerticalScrollBar"
+                                       Style="{StaticResource ThinScrollBar}"
+                                       Minimum="0" Maximum="{TemplateBinding ScrollableHeight}"
+                                       ViewportSize="{TemplateBinding ViewportHeight}"
+                                       Value="{TemplateBinding VerticalOffset}"/>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="320" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ═══ 左侧设置面板 ═══ -->
+        <Border Grid.Column="0"
+                Background="{DynamicResource Layer02Brush}"
+                BorderBrush="{DynamicResource ControlStrokeBrush}"
+                BorderThickness="0,0,1,0"
+                Padding="16">
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          Style="{StaticResource ThinScrollViewer}">
+                <StackPanel>
+                    <!-- 返回按钮 -->
+                    <Button Margin="0,0,0,12" Padding="8,6"
+                            HorizontalAlignment="Left"
+                            Click="BackBtn_Click"
+                            Content="← 返回首页" />
+
+                    <TextBlock Style="{StaticResource SubtitleText}" Text="自定义打印" Margin="0,0,0,16" />
+
+                    <!-- 添加元素 -->
+                    <TextBlock Style="{StaticResource CaptionText}" Text="添加元素" Margin="0,0,0,4" />
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <Button x:Name="AddTextBtn" Padding="12,8" Margin="0,0,8,0"
+                                Click="AddTextBtn_Click" Content="+ 文字" />
+                        <Button x:Name="AddImageBtn" Padding="12,8" Margin="0,0,8,0"
+                                Click="AddImageBtn_Click" Content="+ 图片" />
+                        <Button x:Name="AddCodeBtn" Padding="12,8" Margin="0,0,8,0"
+                                Click="AddCodeBtn_Click" Content="+ 条码" />
+                        <Button x:Name="AddFormulaBtn" Padding="12,8"
+                                Click="AddFormulaBtn_Click" Content="+ 公式" />
+                    </StackPanel>
+
+                    <!-- 元素列表 -->
+                    <TextBlock Style="{StaticResource CaptionText}" Text="元素列表" Margin="0,0,0,4" />
+                    <ListBox x:Name="ElementList" Height="160" Margin="0,0,0,12"
+                             SelectionChanged="ElementList_SelectionChanged">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding DisplayName}" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <!-- 选中元素属性 -->
+                    <Border x:Name="ElementProps" Visibility="Collapsed"
+                            BorderBrush="{DynamicResource ControlStrokeBrush}"
+                            BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource CaptionText}" Text="选中元素属性" Margin="0,0,0,8" />
+
+                            <!-- 位置 -->
+                            <TextBlock Style="{StaticResource CaptionText}" Text="X 位置（点）" Margin="0,0,0,4" />
+                            <TextBox x:Name="PosXInput" Padding="6,4" TextChanged="PosInput_TextChanged" />
+
+                            <TextBlock Style="{StaticResource CaptionText}" Text="Y 位置（点）" Margin="0,8,0,4" />
+                            <TextBox x:Name="PosYInput" Padding="6,4" TextChanged="PosInput_TextChanged" />
+
+                            <!-- 文字元素专属 -->
+                            <StackPanel x:Name="TextProps" Visibility="Collapsed">
+                                <TextBlock Style="{StaticResource CaptionText}" Text="文字内容" Margin="0,12,0,4" />
+                                <TextBox x:Name="ElementText" Height="60" TextWrapping="Wrap"
+                                         AcceptsReturn="True" Padding="6,4"
+                                         TextChanged="ElementText_TextChanged" />
+
+                                <TextBlock Style="{StaticResource CaptionText}" Text="字号" Margin="0,8,0,4" />
+                                <Slider x:Name="ElementFontSize" Minimum="12" Maximum="48" Value="24"
+                                        TickFrequency="1" IsSnapToTickEnabled="True"
+                                        ValueChanged="ElementFontSize_ValueChanged" />
+                            </StackPanel>
+
+                            <!-- 公式元素专属 -->
+                            <StackPanel x:Name="FormulaProps" Visibility="Collapsed">
+                                <TextBlock Style="{StaticResource CaptionText}" Text="LaTeX 公式" Margin="0,12,0,4" />
+                                <TextBox x:Name="ElementFormula" Height="60" TextWrapping="Wrap"
+                                         AcceptsReturn="True" Padding="6,4"
+                                         TextChanged="ElementFormula_TextChanged" />
+                                <TextBlock Style="{StaticResource CaptionText}" Text="示例: \frac{1}{2} 或 E=mc^2" Margin="0,4,0,4" />
+                            </StackPanel>
+
+                            <!-- 操作按钮 -->
+                            <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                <Button Padding="8,6" Margin="0,0,8,0"
+                                        Click="MoveUpBtn_Click" Content="上移" />
+                                <Button Padding="8,6" Margin="0,0,8,0"
+                                        Click="MoveDownBtn_Click" Content="下移" />
+                                <Button Padding="8,6"
+                                        Click="DeleteBtn_Click" Content="删除" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- 画布最小长度 -->
+                    <TextBlock Style="{StaticResource CaptionText}" Text="最小长度（点）" Margin="0,0,0,4" />
+                    <TextBox x:Name="MinLengthInput" Padding="6,4" Text="200"
+                             TextChanged="MinLengthInput_TextChanged" />
+
+                    <!-- 浓度 -->
+                    <TextBlock Style="{StaticResource CaptionText}" Text="打印浓度" Margin="0,20,0,4" />
+                    <StackPanel Orientation="Horizontal">
+                        <Slider x:Name="ThicknessSlider" Minimum="1" Maximum="5" Value="3"
+                                Width="200" TickFrequency="1" IsSnapToTickEnabled="True"
+                                ValueChanged="ThicknessSlider_ValueChanged" />
+                        <TextBlock x:Name="ThicknessLabel" Margin="8,0,0,0"
+                                   Style="{StaticResource BodyText}" Text="3" />
+                    </StackPanel>
+
+                    <!-- 操作按钮 -->
+                    <Button x:Name="SaveTemplateBtn" Margin="0,20,0,0" Padding="0,10"
+                            HorizontalAlignment="Stretch"
+                            Click="SaveTemplateBtn_Click"
+                            Content="保存为模板" />
+
+                    <!-- 打印按钮 -->
+                    <Button x:Name="PrintBtn" Margin="0,8,0,0" Padding="0,12"
+                            HorizontalAlignment="Stretch"
+                            Click="PrintBtn_Click"
+                            Content="打印" />
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- ═══ 右侧预览区 ═══ -->
+        <Grid Grid.Column="1" Margin="24">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0" Style="{StaticResource SubtitleText}" Text="画布预览" Margin="0,0,0,12" />
+
+            <ScrollViewer Grid.Row="1"
+                          HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Auto">
+                <Border x:Name="CanvasBorder"
+                        Background="White"
+                        BorderBrush="{DynamicResource ControlStrokeBrush}"
+                        BorderThickness="1"
+                        CornerRadius="4"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Top">
+                    <Canvas x:Name="CanvasArea" />
+                </Border>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</UserControl>

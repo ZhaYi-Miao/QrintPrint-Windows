@@ -1,0 +1,116 @@
+<UserControl x:Class="QrintPrint.Views.Pages.WordPrintPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="320" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ═══ 左侧设置面板 ═══ -->
+        <Border Grid.Column="0"
+                Background="{DynamicResource Layer02Brush}"
+                BorderBrush="{DynamicResource ControlStrokeBrush}"
+                BorderThickness="0,0,1,0"
+                Padding="16">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <!-- 返回按钮 -->
+                    <Button Margin="0,0,0,12" Padding="8,6"
+                            HorizontalAlignment="Left"
+                            Click="BackBtn_Click"
+                            Content="← 返回首页" />
+
+                    <TextBlock Style="{StaticResource SubtitleText}" Text="Word 文档打印" Margin="0,0,0,16" />
+
+                    <!-- 选择文档 -->
+                    <Button x:Name="SelectDocBtn" Margin="0,0,0,12" Padding="0,10"
+                            HorizontalAlignment="Stretch"
+                            Click="SelectDocBtn_Click"
+                            Content="选择 Word 文档..." />
+
+                    <!-- 文档信息 -->
+                    <Border x:Name="DocInfo" Visibility="Collapsed"
+                            BorderBrush="{DynamicResource ControlStrokeBrush}"
+                            BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource CaptionText}" Text="文档信息" Margin="0,0,0,8" />
+                            <TextBlock x:Name="FileNameText" Style="{StaticResource BodyText}" TextWrapping="Wrap" />
+                            <TextBlock x:Name="PageCountText" Margin="0,4,0,0"
+                                       Style="{StaticResource CaptionText}" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- 字体大小 -->
+                    <TextBlock Style="{StaticResource CaptionText}" Text="字体大小" Margin="0,0,0,4" />
+                    <StackPanel Orientation="Horizontal">
+                        <Slider x:Name="FontSizeSlider" Minimum="12" Maximum="48" Value="24"
+                                Width="200" TickFrequency="1" IsSnapToTickEnabled="True"
+                                ValueChanged="FontSizeSlider_ValueChanged" />
+                        <TextBlock x:Name="FontSizeLabel" Margin="8,0,0,0"
+                                   Style="{StaticResource BodyText}" Text="24" />
+                    </StackPanel>
+
+                    <!-- 字体样式 -->
+                    <TextBlock Style="{StaticResource CaptionText}" Text="字体样式" Margin="0,16,0,4" />
+                    <StackPanel Orientation="Horizontal">
+                        <CheckBox x:Name="BoldCheck" Content="加粗" Margin="0,0,16,0"
+                                  Checked="StyleCheck_Changed" Unchecked="StyleCheck_Changed" />
+                        <CheckBox x:Name="ItalicCheck" Content="斜体" Margin="0,0,16,0"
+                                  Checked="StyleCheck_Changed" Unchecked="StyleCheck_Changed" />
+                    </StackPanel>
+
+                    <!-- 行间距 -->
+                    <TextBlock Style="{StaticResource CaptionText}" Text="行间距（点）" Margin="0,16,0,4" />
+                    <StackPanel Orientation="Horizontal">
+                        <Slider x:Name="LineSpacingSlider" Minimum="0" Maximum="20" Value="6"
+                                Width="200" TickFrequency="1" IsSnapToTickEnabled="True"
+                                ValueChanged="LineSpacingSlider_ValueChanged" />
+                        <TextBlock x:Name="LineSpacingLabel" Margin="8,0,0,0"
+                                   Style="{StaticResource BodyText}" Text="6" />
+                    </StackPanel>
+
+                    <!-- 边距 -->
+                    <TextBlock Style="{StaticResource CaptionText}" Text="边距（点）" Margin="0,16,0,4" />
+                    <StackPanel Orientation="Horizontal">
+                        <Slider x:Name="MarginSlider" Minimum="0" Maximum="32" Value="8"
+                                Width="200" TickFrequency="1" IsSnapToTickEnabled="True"
+                                ValueChanged="MarginSlider_ValueChanged" />
+                        <TextBlock x:Name="MarginLabel" Margin="8,0,0,0"
+                                   Style="{StaticResource BodyText}" Text="8" />
+                    </StackPanel>
+
+                    <!-- 打印按钮 -->
+                    <Button x:Name="PrintBtn" Margin="0,24,0,0" Padding="0,12"
+                            HorizontalAlignment="Stretch"
+                            Click="PrintBtn_Click"
+                            Content="打印" />
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- ═══ 右侧预览区 ═══ -->
+        <Grid Grid.Column="1" Margin="24">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0" Style="{StaticResource SubtitleText}" Text="实时预览" Margin="0,0,0,12" />
+
+            <ScrollViewer Grid.Row="1"
+                          HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Auto">
+                <Border x:Name="PreviewBorder"
+                        Background="White"
+                        BorderBrush="{DynamicResource ControlStrokeBrush}"
+                        BorderThickness="1"
+                        CornerRadius="4"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Top">
+                    <Image x:Name="PreviewImage" Stretch="None" />
+                </Border>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</UserControl>

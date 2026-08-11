@@ -1,0 +1,62 @@
+<UserControl x:Class="QrintPrint.Views.Pages.TemplatePage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <DockPanel>
+            <!-- 顶部操作栏 -->
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,16">
+                <TextBlock Style="{StaticResource SubtitleText}" Text="我的模板" VerticalAlignment="Center" />
+                <Button Margin="16,0,0,0" Padding="12,8"
+                        Click="NewTemplateBtn_Click" Content="新建模板" />
+            </StackPanel>
+
+            <!-- 模板列表 -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ItemsControl x:Name="TemplateList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Margin="0,0,0,8" Padding="16"
+                                    Background="{DynamicResource Layer02Brush}"
+                                    BorderBrush="{DynamicResource ControlStrokeBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="8">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- 信息 -->
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                        <TextBlock Style="{StaticResource BodyStrongText}"
+                                                   Text="{Binding Name}" />
+                                        <TextBlock Margin="0,4,0,0" Style="{StaticResource CaptionText}"
+                                                   Text="{Binding Detail}" />
+                                        <TextBlock Margin="0,2,0,0" Style="{StaticResource CaptionText}"
+                                                   Text="{Binding TimeText}" />
+                                    </StackPanel>
+
+                                    <!-- 操作按钮 -->
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Button Padding="12,8" Margin="0,0,8,0"
+                                                Click="LoadBtn_Click"
+                                                Tag="{Binding}"
+                                                Content="加载" />
+                                        <Button Padding="12,8"
+                                                Click="DeleteBtn_Click"
+                                                Tag="{Binding}"
+                                                Content="删除" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </DockPanel>
+    </Grid>
+</UserControl>

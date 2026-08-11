@@ -1,0 +1,100 @@
+<UserControl x:Class="QrintPrint.Views.Pages.BarcodePrintPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="320" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ═══ 左侧设置面板 ═══ -->
+        <Border Grid.Column="0"
+                Background="{DynamicResource Layer02Brush}"
+                BorderBrush="{DynamicResource ControlStrokeBrush}"
+                BorderThickness="0,0,1,0"
+                Padding="16">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <!-- 返回按钮 -->
+                    <Button Margin="0,0,0,12" Padding="8,6"
+                            HorizontalAlignment="Left"
+                            Click="BackBtn_Click"
+                            Content="← 返回首页" />
+
+                    <TextBlock Style="{StaticResource SubtitleText}" Text="条码打印" Margin="0,0,0,16" />
+
+                    <!-- 码制分类 -->
+                    <TextBlock Style="{StaticResource CaptionText}" Text="码制类型" Margin="0,0,0,4" />
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                        <RadioButton x:Name="OneDRadio" Content="一维码" Margin="0,0,16,0"
+                                     IsChecked="True" Checked="CategoryRadio_Changed" />
+                        <RadioButton x:Name="TwoDRadio" Content="二维码"
+                                     Checked="CategoryRadio_Changed" />
+                    </StackPanel>
+
+                    <!-- 码制选择 -->
+                    <TextBlock Style="{StaticResource CaptionText}" Text="选择码制" Margin="0,0,0,4" />
+                    <ComboBox x:Name="CodeTypeCombo" Margin="0,0,0,4"
+                              SelectionChanged="CodeTypeCombo_SelectionChanged" />
+
+                    <!-- 码制提示 -->
+                    <TextBlock x:Name="CodeHint" Margin="0,4,0,12"
+                               Style="{StaticResource CaptionText}"
+                               TextWrapping="Wrap" />
+
+                    <!-- 条码内容 -->
+                    <TextBlock Style="{StaticResource CaptionText}" Text="条码内容" Margin="0,0,0,4" />
+                    <TextBox x:Name="CodeContent" Height="60" TextWrapping="Wrap"
+                             AcceptsReturn="False"
+                             VerticalScrollBarVisibility="Auto"
+                             FontFamily="{StaticResource MonoFontFamily}"
+                             FontSize="14"
+                             Padding="8"
+                             TextChanged="CodeContent_TextChanged" />
+
+                    <!-- 校验提示 -->
+                    <TextBlock x:Name="ValidationError" Margin="0,4,0,0"
+                               Style="{StaticResource CaptionText}"
+                               Foreground="{DynamicResource StatusDangerBrush}"
+                               Visibility="Collapsed" />
+
+                    <!-- 浓度 -->
+                    <TextBlock Style="{StaticResource CaptionText}" Text="打印浓度" Margin="0,20,0,4" />
+                    <StackPanel Orientation="Horizontal">
+                        <Slider x:Name="ThicknessSlider" Minimum="1" Maximum="5" Value="3"
+                                Width="200" TickFrequency="1" IsSnapToTickEnabled="True"
+                                ValueChanged="ThicknessSlider_ValueChanged" />
+                        <TextBlock x:Name="ThicknessLabel" Margin="8,0,0,0"
+                                   Style="{StaticResource BodyText}" Text="3" />
+                    </StackPanel>
+
+                    <!-- 打印按钮 -->
+                    <Button x:Name="PrintBtn" Margin="0,24,0,0" Padding="0,12"
+                            HorizontalAlignment="Stretch"
+                            Click="PrintBtn_Click"
+                            Content="打印" />
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- ═══ 右侧预览区 ═══ -->
+        <Grid Grid.Column="1" Margin="24">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0" Style="{StaticResource SubtitleText}" Text="实时预览" Margin="0,0,0,12" />
+
+            <Border Grid.Row="1"
+                    Background="White"
+                    BorderBrush="{DynamicResource ControlStrokeBrush}"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Top">
+                <Image x:Name="PreviewImage" Stretch="None" />
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

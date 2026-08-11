@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>QrintPrint</RootNamespace>
+    <AssemblyName>QrintPrint</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>icon.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <!-- 自包含发布配置:将 .NET 运行时嵌入程序中,用户无需安装 .NET -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PublishSingleFile>false</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+  </PropertyGroup>
+
+  <!-- 资源文件:图标 -->
+  <ItemGroup>
+    <Resource Include="icon.ico" />
+  </ItemGroup>
+
+  <!-- 蓝牙 SPP:用 32feet.NET 4.x(.NET / netstandard2.0),不要 3.x(只支持 .NET Framework) -->
+  <ItemGroup>
+    <PackageReference Include="DocumentFormat.OpenXml" Version="3.2.0" />
+    <PackageReference Include="InTheHand.Net.Bluetooth" Version="4.1.44" />
+    <PackageReference Include="WpfMath" Version="2.1.0" />
+    <!-- 条码生成：一维码 + 二维码全覆盖 -->
+    <PackageReference Include="ZXing.Net" Version="0.16.9" />
+    <PackageReference Include="ZXing.Net.Bindings.ImageSharp" Version="0.16.14" />
+    <!-- 图像处理：替代 HarmonyOS ImageSharp(修 GHSA-2cmq-823j-5qj8 等漏洞) -->
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.7" />
+    <!-- 本地 JSON 存储：模板 / 打印历史(修 GHSA-8g4q-xg66-9fp4) -->
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+  </ItemGroup>
+
+</Project>
