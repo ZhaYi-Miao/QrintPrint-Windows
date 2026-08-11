@@ -110,4 +110,4 @@ ZhaYi & DeepSeek
 
 ## License
 
-MIT
+GPL-v3.0
