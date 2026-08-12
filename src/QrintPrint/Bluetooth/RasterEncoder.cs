@@ -238,6 +238,13 @@ public static class RasterEncoder
     private static FontStyle ResolveFontStyle(bool italic) => italic ? FontStyles.Italic : FontStyles.Normal;
 
     /// <summary>
+    /// 公开的单行文本宽度测量(含字间距),用于富文本拼接时精确换行。
+    /// </summary>
+    public static double MeasureTextWidth(string text, TextRenderOptions options) =>
+        MeasureTextWidth(text, options.FontFamily, options.FontSize, options.Bold, options.Italic)
+        + text.Length * options.LetterSpacing;
+
+    /// <summary>
     /// 用 FormattedText 量出单行文本在指定字号下的像素宽度。
     /// </summary>
     private static double MeasureTextWidth(string text, string fontFamily, double fontSize, bool bold, bool italic)

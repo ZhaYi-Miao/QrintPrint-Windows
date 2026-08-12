@@ -25,18 +25,23 @@ public partial class HomePage : UserControl, IPage
     /// <summary>根据 PrinterStatus 刷新状态卡显示</summary>
     private void RefreshStatusCard()
     {
-        var status = PrinterConnection.Instance.Status;
+        var conn = PrinterConnection.Instance;
+        var status = conn.Status;
         bool connected = status.ConnState == ConnState.CONNECTED;
+        // 蓝牙已连接才能查询状态（USB 模式会自动尝试连蓝牙）
+        bool canQueryStatus = conn.IsBluetoothConnected;
 
         StatusDot.Fill = connected
             ? (System.Windows.Media.Brush)FindResource("StatusSuccessBrush")
             : (System.Windows.Media.Brush)FindResource("TextTertiaryBrush");
         StatusLabel.Text = PrinterStatusLabels.ConnLabel(status.ConnState);
 
-        BatteryValue.Text = status.BatteryPercent is { } b ? $"{b}%" : "—";
-        PaperValue.Text = connected ? PrinterStatusLabels.PaperLabel(status.PaperState) : "—";
-        HardwareValue.Text = connected ? PrinterStatusLabels.HardwareLabel(status.HardwareState) : "—";
+        // 只有蓝牙连接时才显示状态，否则显示 "—"
+        BatteryValue.Text = canQueryStatus && status.BatteryPercent is { } b ? $"{b}%" : "—";
+        PaperValue.Text = canQueryStatus ? PrinterStatusLabels.PaperLabel(status.PaperState) : "—";
+        HardwareValue.Text = canQueryStatus ? PrinterStatusLabels.HardwareLabel(status.HardwareState) : "—";
         ThicknessValue.Text = connected ? "3 级" : "—";
+
         ConnBtn.Content = connected ? "断开" : "连接打印机";
     }
 
@@ -54,21 +59,33 @@ public partial class HomePage : UserControl, IPage
         {
             Owner = Window.GetWindow(this),
         };
-        if (dlg.ShowDialog() == true && dlg.SelectedDevice is { } dev)
+        if (dlg.ShowDialog() == true)
         {
-            // Windows 11 首次连接时，系统会弹出配对请求，给用户提示
-            try
+            // USB 设备连接（winspool 单向打印 + 自动蓝牙查状态）
+            if (dlg.SelectedUsbDevice is { } usbDev)
             {
-                BluetoothPairingHelper.ShowPairingGuide();
-            }
-            catch (OperationCanceledException)
-            {
-                // 用户取消了连接
+                await conn.ConnectUsbAsync(usbDev);
+                RefreshStatusCard();
                 return;
             }
 
-            await conn.ConnectAsync(dev.DeviceId, dev.Name);
-            RefreshStatusCard();
+            // 蓝牙设备连接
+            if (dlg.SelectedDevice is { } dev)
+            {
+                // Windows 11 首次连接时，系统会弹出配对请求，给用户提示
+                try
+                {
+                    BluetoothPairingHelper.ShowPairingGuide();
+                }
+                catch (OperationCanceledException)
+                {
+                    // 用户取消了连接
+                    return;
+                }
+
+                await conn.ConnectAsync(dev.DeviceId, dev.Name);
+                RefreshStatusCard();
+            }
         }
     }
 
@@ -88,6 +105,9 @@ public partial class HomePage : UserControl, IPage
                     "code" => new BarcodePrintPage(),
                     "custom" => new CustomPrintPage(),
                     "word" => new WordPrintPage(),
+                    "table" => new TablePrintPage(),
+                    "schedule" => new SchedulePrintPage(),
+                    "markdown" => new MarkdownPrintPage(),
                     _ => null,
                 };
                 if (page is not null) mainWindow.NavigateTo(page);

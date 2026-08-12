@@ -1,0 +1,85 @@
+<UserControl x:Class="QrintPrint.Views.Pages.MarkdownPrintPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Loaded="UserControl_Loaded">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="320" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ═══ 左侧设置面板 ═══ -->
+        <Border Grid.Column="0"
+                Background="{DynamicResource Layer02Brush}"
+                BorderBrush="{DynamicResource ControlStrokeBrush}"
+                BorderThickness="0,0,1,0"
+                Padding="16">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <Button Margin="0,0,0,12" Padding="8,6"
+                            HorizontalAlignment="Left"
+                            Click="BackBtn_Click"
+                            Content="← 返回首页" />
+
+                    <TextBlock Style="{StaticResource SubtitleText}" Text="Markdown 打印" Margin="0,0,0,16" />
+
+                    <!-- Markdown 输入 -->
+                    <TextBlock Style="{StaticResource CaptionText}" Text="Markdown 内容" Margin="0,0,0,4" />
+                    <TextBox x:Name="MarkdownContent" Height="200" TextWrapping="Wrap"
+                             AcceptsReturn="True"
+                             VerticalScrollBarVisibility="Auto"
+                             FontFamily="Consolas"
+                             FontSize="13"
+                             Padding="8"
+                             TextChanged="MarkdownContent_TextChanged" />
+
+                    <!-- 字体大小 -->
+                    <TextBlock Style="{StaticResource CaptionText}" Text="字体大小" Margin="0,16,0,4" />
+                    <StackPanel Orientation="Horizontal">
+                        <Slider x:Name="FontSizeSlider" Minimum="10" Maximum="32" Value="16"
+                                Width="200" TickFrequency="1" IsSnapToTickEnabled="True"
+                                ValueChanged="FontSizeSlider_ValueChanged" />
+                        <TextBlock x:Name="FontSizeLabel" Margin="8,0,0,0"
+                                   Style="{StaticResource BodyText}" Text="16" />
+                    </StackPanel>
+
+                    <!-- 边距 -->
+                    <TextBlock Style="{StaticResource CaptionText}" Text="边距（点）" Margin="0,16,0,4" />
+                    <StackPanel Orientation="Horizontal">
+                        <Slider x:Name="MarginSlider" Minimum="2" Maximum="20" Value="6"
+                                Width="200" TickFrequency="1" IsSnapToTickEnabled="True"
+                                ValueChanged="MarginSlider_ValueChanged" />
+                        <TextBlock x:Name="MarginLabel" Margin="8,0,0,0"
+                                   Style="{StaticResource BodyText}" Text="6" />
+                    </StackPanel>
+
+                    <!-- 打印按钮 -->
+                    <Button x:Name="PrintBtn" Margin="0,24,0,0" Padding="0,12"
+                            HorizontalAlignment="Stretch"
+                            Click="PrintBtn_Click"
+                            Content="打印" />
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- ═══ 右侧预览区 ═══ -->
+        <Grid Grid.Column="1" Margin="24">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0" Style="{StaticResource SubtitleText}" Text="实时预览" Margin="0,0,0,12" />
+
+            <Border Grid.Row="1"
+                    Background="White"
+                    BorderBrush="{DynamicResource ControlStrokeBrush}"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Top">
+                <Image x:Name="PreviewImage" Stretch="None" />
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

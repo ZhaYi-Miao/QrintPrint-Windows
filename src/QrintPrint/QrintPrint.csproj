@@ -38,6 +38,8 @@
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.7" />
     <!-- 本地 JSON 存储：模板 / 打印历史(修 GHSA-8g4q-xg66-9fp4) -->
     <PackageReference Include="System.Text.Json" Version="8.0.5" />
+    <!-- USB 设备检测：WMI 查询打印机设备 -->
+    <PackageReference Include="System.Management" Version="8.0.0" />
   </ItemGroup>
 
 </Project>

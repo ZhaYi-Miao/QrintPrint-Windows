@@ -21,6 +21,15 @@ using QrintPrint.Models;
 
 namespace QrintPrint.Bluetooth;
 
+/// <summary>打印传输方式</summary>
+public enum TransportMode
+{
+    /// <summary>蓝牙 SPP（经典蓝牙）</summary>
+    BLUETOOTH,
+    /// <summary>USB 有线连接（winspool.drv RAW，单向打印）</summary>
+    USB,
+}
+
 /// <summary>打印结果</summary>
 public readonly record struct PrintResult(bool Ok, string Message);
 
@@ -65,6 +74,12 @@ public sealed class PrinterConnection : IDisposable
     private bool _foreground = true;
     private bool _busy;
 
+    /// <summary>当前传输方式</summary>
+    public TransportMode CurrentTransport { get; private set; } = TransportMode.BLUETOOTH;
+
+    /// <summary>蓝牙是否已连接（用于状态查询）</summary>
+    public bool IsBluetoothConnected => _client is not null && _stream is not null;
+
     /// <summary>是否开启自动重连</summary>
     public bool AutoReconnectEnabled { get; set; } = true;
 
@@ -98,6 +113,10 @@ public sealed class PrinterConnection : IDisposable
 
     public bool IsAlive()
     {
+        // USB 模式: 只要连接状态是 CONNECTED 就认为存活
+        if (CurrentTransport == TransportMode.USB)
+            return _status.ConnState == ConnState.CONNECTED;
+
         var stream = _stream;
         var client = _client;
         if (stream is null || client is null) return false;
@@ -132,6 +151,7 @@ public sealed class PrinterConnection : IDisposable
             StartReadLoop();
 
             _status.ConnState = ConnState.CONNECTED;
+            CurrentTransport = TransportMode.BLUETOOTH;
         }
         catch (Exception ex)
         {
@@ -147,11 +167,97 @@ public sealed class PrinterConnection : IDisposable
         return true;
     }
 
+    /// <summary>
+    /// 通过 USB 连接打印机（winspool 模式，单向打印）。
+    /// 同时自动尝试连接蓝牙用于状态查询。
+    /// </summary>
+    public async Task<bool> ConnectUsbAsync(UsbPrinterDevice device)
+    {
+        Disconnect();
+        _status.DeviceId = device.DeviceId;
+        _status.DeviceName = device.Name;
+        _status.ConnState = ConnState.CONNECTING;
+        _status.LastError = string.Empty;
+
+        try
+        {
+            // 确保打印机队列存在
+            if (!device.QueueExists)
+            {
+                bool created = UsbTransport.CreateQueue(device.PortName);
+                if (!created)
+                {
+                    _status.ConnState = ConnState.DISCONNECTED;
+                    _status.LastError = "创建打印机队列失败，请检查管理员权限";
+                    return false;
+                }
+            }
+
+            _status.ConnState = ConnState.CONNECTED;
+            CurrentTransport = TransportMode.USB;
+        }
+        catch (Exception ex)
+        {
+            _status.ConnState = ConnState.DISCONNECTED;
+            _status.LastError = $"USB 连接失败: {ex.Message}";
+            return false;
+        }
+
+        // USB 连接成功后，自动尝试连接蓝牙用于状态查询
+        await TryConnectBluetoothForStatusAsync();
+
+        return true;
+    }
+
+    /// <summary>
+    /// USB 模式下自动尝试连接蓝牙，用于状态查询（电量、纸张等）。
+    /// 如果蓝牙连接失败，不影响 USB 打印，只是状态显示 "—"。
+    /// </summary>
+    private async Task TryConnectBluetoothForStatusAsync()
+    {
+        // 查找已配对的 BY-288 蓝牙设备
+        var paired = PrinterDiscovery.ListPairedDevices();
+        var btDevice = paired.FirstOrDefault(d =>
+            d.Name.Contains("BY-288", StringComparison.OrdinalIgnoreCase) ||
+            d.Name.Contains("Beeprt", StringComparison.OrdinalIgnoreCase));
+
+        // BtDevice 是 struct，检查是否找到（DeviceId 不为空）
+        if (string.IsNullOrEmpty(btDevice.DeviceId)) return;
+
+        try
+        {
+            _client = new BluetoothClient();
+            var endpoint = new BluetoothEndPoint(
+                BluetoothAddress.Parse(btDevice.DeviceId),
+                BluetoothService.SerialPort);
+            await Task.Run(() => _client.Connect(endpoint));
+            _stream = _client.GetStream();
+
+            // 启动后台读循环
+            StartReadLoop();
+
+            // 通过蓝牙查询一次状态
+            await RefreshAllAsync();
+            _ = QueryDeviceInfoAsync();
+
+            // 启动状态轮询
+            if (_foreground) StartPolling();
+        }
+        catch
+        {
+            // 蓝牙连接失败不影响 USB 打印，状态会显示 "—"
+            _client?.Dispose();
+            _client = null;
+            _stream = null;
+        }
+    }
+
     public void Disconnect()
     {
         StopPolling();
         lock (_rxLock) _rxBuffer.Clear();
         _busy = false;
+        CurrentTransport = TransportMode.BLUETOOTH;
 
         var stream = _stream;
         var client = _client;
@@ -162,7 +268,6 @@ public sealed class PrinterConnection : IDisposable
         try { client?.Dispose(); } catch { }
 
         _status.ConnState = ConnState.DISCONNECTED;
-        // 断开后必须清掉读数,否则会残留上次连接的纸张/电量,变成假数据
         _status.Reset();
     }
 
@@ -327,7 +432,7 @@ public sealed class PrinterConnection : IDisposable
         });
     }
 
-    // ── 查询 ──────────────────────────────────────────────────
+    // ── 查询 ─────────────────────────────────────────────────
 
     public async Task<QringProtocol.QringStatus?> QueryStatusAsync()
     {
@@ -388,6 +493,10 @@ public sealed class PrinterConnection : IDisposable
     public async Task<string?> PreflightCheckAsync()
     {
         if (!IsAlive()) return "打印机未连接";
+
+        // 只有蓝牙连接时才能查询状态
+        if (!IsBluetoothConnected) return null;
+
         var status = await QueryStatusAsync();
         if (status is null) return null;
         _status.ApplyQringStatus(status.Value);
@@ -406,6 +515,10 @@ public sealed class PrinterConnection : IDisposable
         if (!IsAlive()) return new PrintResult(false, "打印机未连接");
         if (_busy) return new PrintResult(false, "上一个打印任务还没结束");
 
+        // 打印前检查状态（蓝牙/WinUSB 会实际查询，USB winspool 直接放行）
+        string? fault = await PreflightCheckAsync();
+        if (fault is not null) return new PrintResult(false, fault);
+
         _busy = true;
         // 打印期间停掉轮询,别让状态查询的字节混进打印数据流
         StopPolling();
@@ -413,6 +526,13 @@ public sealed class PrinterConnection : IDisposable
 
         try
         {
+            // USB winspool 模式: 构建完整命令序列，一次性发送（单向，无法等 ACK）
+            if (CurrentTransport == TransportMode.USB)
+            {
+                return await PrintRasterUsbAsync(raster, thickness);
+            }
+
+            // 蓝牙 / WinUSB 模式: 支持双向通信，可以等 ACK
             if (!await SendAllAsync(new[] { QringProtocol.CMD_ENABLE, QringProtocol.CMD_ENABLE2 }))
             {
                 return new PrintResult(false, "发送失败,连接可能已断开");
@@ -443,9 +563,77 @@ public sealed class PrinterConnection : IDisposable
         {
             _status.Printing = false;
             _busy = false;
-            // 打完刷新一次状态,纸张/电量会有变化
+            // 打印后刷新状态，纸张/电量会有变化
             await RefreshAllAsync();
             if (_foreground && IsAlive()) StartPolling();
+        }
+    }
+
+    /// <summary>
+    /// USB 模式打印光栅位图。
+    /// 构建完整的命令序列（握手 + 浓度 + 唤醒 + 走纸 + 光栅 + 走纸 + 停止），
+    /// 然后通过 winspool.drv 一次性发送。
+    /// </summary>
+    private async Task<PrintResult> PrintRasterUsbAsync(RasterData raster, byte? thickness)
+    {
+        _status.Printing = true;
+        try
+        {
+            // 构建完整命令序列
+            var commands = new List<byte[]>();
+
+            // 1. 握手命令
+            commands.Add(QringProtocol.CMD_ENABLE);
+            commands.Add(QringProtocol.CMD_ENABLE2);
+
+            // 2. 浓度设置
+            if (thickness is { } t)
+            {
+                commands.Add(QringProtocol.CmdThickness(t));
+            }
+
+            // 3. 唤醒
+            commands.Add(QringProtocol.CMD_WAKEUP);
+
+            // 4. 走纸（前）
+            commands.AddRange(QringProtocol.CmdFeed(FEED_BEFORE));
+
+            // 5. 光栅头
+            commands.Add(QringProtocol.CmdRasterHeader(raster.WidthBytes, raster.Height, 0));
+
+            // 6. 光栅数据
+            commands.Add(raster.Data);
+
+            // 7. 走纸（后）
+            commands.AddRange(QringProtocol.CmdFeed(FEED_AFTER));
+
+            // 8. 停止
+            commands.Add(QringProtocol.CMD_STOP);
+
+            // 合并所有命令
+            int totalLength = commands.Sum(c => c.Length);
+            byte[] jobData = new byte[totalLength];
+            int offset = 0;
+            foreach (var cmd in commands)
+            {
+                Buffer.BlockCopy(cmd, 0, jobData, offset, cmd.Length);
+                offset += cmd.Length;
+            }
+
+            // 通过 USB 发送
+            int written = await Task.Run(() => UsbTransport.SendRaw(jobData, "QrintPrint Job"));
+            if (written <= 0)
+            {
+                _status.LastError = "USB 发送失败";
+                return new PrintResult(false, "USB 发送失败");
+            }
+
+            // USB 模式无法等待 ACK，假设发送成功即打印成功
+            return new PrintResult(true, "打印完成");
+        }
+        finally
+        {
+            _status.Printing = false;
         }
     }
 
@@ -479,7 +667,9 @@ public sealed class PrinterConnection : IDisposable
 
     private async Task PollOnceAsync()
     {
-        if (_client is null || _busy) return;
+        if (_busy) return;
+        // 只有蓝牙连接时才能轮询状态
+        if (_client is null || _stream is null) return;
         await RefreshAllAsync();
     }
 

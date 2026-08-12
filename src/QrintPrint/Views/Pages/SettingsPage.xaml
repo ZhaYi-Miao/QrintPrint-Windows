@@ -87,7 +87,7 @@
                 <StackPanel>
                     <TextBlock Style="{StaticResource BodyStrongText}" Text="QrintPrint" />
                     <TextBlock Margin="0,4,0,0" Style="{StaticResource CaptionText}"
-                               Text="错题小印 Windows 版 v1.0.0" />
+                               Text="错题小印 Windows 版 v1.0.2" />
                     <TextBlock Margin="0,8,0,0" Style="{StaticResource CaptionText}"
                                Text="基于 Qring 私有协议，支持文本、照片、条码、自定义画布打印" />
                     <TextBlock Margin="0,12,0,0" Style="{StaticResource CaptionText}"

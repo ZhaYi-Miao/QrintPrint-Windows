@@ -50,7 +50,7 @@
                                    HorizontalAlignment="Right" Text="—" />
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,4">
-                        <TextBlock Style="{StaticResource CaptionText}" Width="56" Text="温度" />
+                        <TextBlock Style="{StaticResource CaptionText}" Width="56" Text="机器状态" />
                         <TextBlock x:Name="HardwareValue" Style="{StaticResource BodyStrongText}"
                                    HorizontalAlignment="Right" Text="—" />
                     </StackPanel>
@@ -128,19 +128,49 @@
             <StackPanel>
                 <TextBlock Style="{StaticResource SubtitleText}" Text="文档打印" />
                 <TextBlock Margin="0,4,0,12" Style="{StaticResource CaptionText}"
-                           Text="支持 Word 文档解析，含 LaTeX 公式识别" />
-                <StackPanel Orientation="Horizontal">
-                    <Button Style="{StaticResource QuickActionButton}" Padding="24,12"
+                           Text="支持 Word、表格、课程表、Markdown 等多种格式" />
+                <WrapPanel>
+                    <Button Style="{StaticResource QuickActionButton}" Padding="24,12" Margin="0,0,8,8"
                             Click="QuickAction_Click" Tag="word" MinHeight="48">
                         <StackPanel Orientation="Horizontal" IsHitTestVisible="False">
                             <TextBlock Style="{StaticResource BodyStrongText}"
-                                       Text="Word 文档打印" />
+                                       Text="Word 文档" />
                             <TextBlock Margin="8,0,0,0" Style="{StaticResource CaptionText}"
                                        VerticalAlignment="Center"
-                                       Text=".docx / 公式识别" />
+                                       Text=".docx" />
                         </StackPanel>
                     </Button>
-                </StackPanel>
+                    <Button Style="{StaticResource QuickActionButton}" Padding="24,12" Margin="0,0,8,8"
+                            Click="QuickAction_Click" Tag="table" MinHeight="48">
+                        <StackPanel Orientation="Horizontal" IsHitTestVisible="False">
+                            <TextBlock Style="{StaticResource BodyStrongText}"
+                                       Text="表格" />
+                            <TextBlock Margin="8,0,0,0" Style="{StaticResource CaptionText}"
+                                       VerticalAlignment="Center"
+                                       Text="自定义行列" />
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource QuickActionButton}" Padding="24,12" Margin="0,0,8,8"
+                            Click="QuickAction_Click" Tag="schedule" MinHeight="48">
+                        <StackPanel Orientation="Horizontal" IsHitTestVisible="False">
+                            <TextBlock Style="{StaticResource BodyStrongText}"
+                                       Text="课程表" />
+                            <TextBlock Margin="8,0,0,0" Style="{StaticResource CaptionText}"
+                                       VerticalAlignment="Center"
+                                       Text="周计划" />
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource QuickActionButton}" Padding="24,12" Margin="0,0,8,8"
+                            Click="QuickAction_Click" Tag="markdown" MinHeight="48">
+                        <StackPanel Orientation="Horizontal" IsHitTestVisible="False">
+                            <TextBlock Style="{StaticResource BodyStrongText}"
+                                       Text="Markdown" />
+                            <TextBlock Margin="8,0,0,0" Style="{StaticResource CaptionText}"
+                                       VerticalAlignment="Center"
+                                       Text="文本渲染" />
+                        </StackPanel>
+                    </Button>
+                </WrapPanel>
             </StackPanel>
         </Border>
 

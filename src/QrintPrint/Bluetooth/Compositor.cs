@@ -130,6 +130,24 @@ public static class Compositor
     public static byte[] CreateBinaryCanvas(int width, int height) =>
         new byte[Math.Max(1, width) * Math.Max(1, height)];
 
+    /// <summary>在二值画布上画一条水平实线(整行置黑)</summary>
+    public static void DrawHLine(byte[] dst, int dstW, int dstH, int y)
+    {
+        if (y < 0 || y >= dstH) return;
+        int rowBase = y * dstW;
+        Array.Fill(dst, (byte)1, rowBase, dstW);
+    }
+
+    /// <summary>在二值画布上画一条垂直实线(整列置黑)</summary>
+    public static void DrawVLine(byte[] dst, int dstW, int dstH, int x)
+    {
+        if (x < 0 || x >= dstW) return;
+        for (int y = 0; y < dstH; y++)
+        {
+            dst[y * dstW + x] = 1;
+        }
+    }
+
     /// <summary>
     /// 把 src 叠到 dst 的 (originX, originY) 处,超出部分自动裁掉。
     ///

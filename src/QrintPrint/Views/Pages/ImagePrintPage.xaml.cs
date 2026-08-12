@@ -14,6 +14,7 @@ public partial class ImagePrintPage : UserControl, IPage
 
     private string? _imagePath;
     private DitherMode _ditherMode = DitherMode.FLOYD_STEINBERG;
+    private int _threshold = 128;
 
     public ImagePrintPage()
     {
@@ -45,8 +46,23 @@ public partial class ImagePrintPage : UserControl, IPage
         if (sender is RadioButton rb && rb.Tag is DitherMode mode)
         {
             _ditherMode = mode;
+            // 仅在"无"抖动模式下显示阈值滑块
+            if (ThresholdPanel != null)
+            {
+                ThresholdPanel.Visibility = mode == DitherMode.NONE
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+            }
             UpdatePreview();
         }
+    }
+
+    private void ThresholdSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (ThresholdLabel is null) return;
+        _threshold = (int)ThresholdSlider.Value;
+        ThresholdLabel.Text = _threshold.ToString();
+        UpdatePreview();
     }
 
     private void ThicknessSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -88,7 +104,8 @@ public partial class ImagePrintPage : UserControl, IPage
         {
             using var image = RasterEncoder.DecodeImageToPrintWidth(_imagePath);
             var gray = RasterEncoder.ImageToGray(image);
-            var binary = Dither.DitherToBinary(gray, _ditherMode, RasterEncoder.THRESHOLD_IMAGE);
+            int threshold = _ditherMode == DitherMode.NONE ? _threshold : RasterEncoder.THRESHOLD_IMAGE;
+            var binary = Dither.DitherToBinary(gray, _ditherMode, threshold);
             var bmp = RasterEncoder.BinaryToPreviewBitmap(binary, gray.Width, gray.Height, transparentWhite: true);
             PreviewImage.Source = bmp;
         }
@@ -128,7 +145,8 @@ public partial class ImagePrintPage : UserControl, IPage
         {
             using var image = RasterEncoder.DecodeImageToPrintWidth(_imagePath);
             var gray = RasterEncoder.ImageToGray(image);
-            var binary = Dither.DitherToBinary(gray, _ditherMode, RasterEncoder.THRESHOLD_IMAGE);
+            int threshold = _ditherMode == DitherMode.NONE ? _threshold : RasterEncoder.THRESHOLD_IMAGE;
+            var binary = Dither.DitherToBinary(gray, _ditherMode, threshold);
             var raster = RasterEncoder.PackBinaryToRaster(binary, gray.Width, gray.Height);
 
             byte thickness = (byte)ThicknessSlider.Value;

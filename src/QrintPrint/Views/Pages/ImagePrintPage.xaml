@@ -39,6 +39,18 @@
                     <TextBlock Style="{StaticResource CaptionText}" Text="抖动算法" Margin="0,20,0,4" />
                     <StackPanel x:Name="DitherOptions" />
 
+                    <!-- 阈值滑块（仅"无"抖动模式显示） -->
+                    <StackPanel x:Name="ThresholdPanel" Visibility="Collapsed" Margin="0,12,0,0">
+                        <TextBlock Style="{StaticResource CaptionText}" Text="阈值" Margin="0,0,0,4" />
+                        <StackPanel Orientation="Horizontal">
+                            <Slider x:Name="ThresholdSlider" Minimum="0" Maximum="255" Value="128"
+                                    Width="200" TickFrequency="1" IsSnapToTickEnabled="True"
+                                    ValueChanged="ThresholdSlider_ValueChanged" />
+                            <TextBlock x:Name="ThresholdLabel" Margin="8,0,0,0"
+                                       Style="{StaticResource BodyText}" Text="128" />
+                        </StackPanel>
+                    </StackPanel>
+
                     <!-- 浓度 -->
                     <TextBlock Style="{StaticResource CaptionText}" Text="打印浓度" Margin="0,20,0,4" />
                     <StackPanel Orientation="Horizontal">

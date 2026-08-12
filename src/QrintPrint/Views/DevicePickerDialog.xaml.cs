@@ -7,17 +7,48 @@ using QrintPrint.Bluetooth;
 
 namespace QrintPrint.Views;
 
+/// <summary>
+/// 设备选择对话框中的列表项。
+/// 支持蓝牙设备和 USB(winspool) 设备。
+/// </summary>
 public sealed class DeviceItem
 {
     public string Name { get; }
     public string Subtitle { get; }
-    public BtDevice Device { get; }
+    public BtDevice? BtDevice { get; }
+    public UsbPrinterDevice? UsbDevice { get; }
+
+    /// <summary>传输方式标签</summary>
+    public string TransportLabel { get; }
+
     public DeviceItem(BtDevice d)
+        : this(
+            name: string.IsNullOrEmpty(d.Name) ? d.DeviceId : d.Name,
+            subtitle: d.Paired ? $"已配对 · {d.DeviceId}" : d.DeviceId,
+            transportLabel: "蓝牙")
     {
-        Device = d;
-        Name = string.IsNullOrEmpty(d.Name) ? d.DeviceId : d.Name;
-        Subtitle = d.Paired ? $"已配对 · {d.DeviceId}" : d.DeviceId;
+        BtDevice = d;
     }
+
+    public DeviceItem(UsbPrinterDevice d)
+        : this(
+            name: d.Name,
+            subtitle: d.QueueExists ? $"已就绪 · {d.PortName}" : $"需要安装驱动 · {d.PortName}",
+            transportLabel: "USB")
+    {
+        UsbDevice = d;
+    }
+
+    private DeviceItem(string name, string subtitle, string transportLabel)
+    {
+        Name = name;
+        Subtitle = subtitle;
+        BtDevice = null;
+        UsbDevice = null;
+        TransportLabel = transportLabel;
+    }
+
+    private DeviceItem() { Name = ""; Subtitle = ""; TransportLabel = ""; }
 }
 
 public partial class DevicePickerDialog : Window
@@ -27,6 +58,7 @@ public partial class DevicePickerDialog : Window
     private List<BtDevice> _allDevices = new();
 
     public BtDevice? SelectedDevice { get; private set; }
+    public UsbPrinterDevice? SelectedUsbDevice { get; private set; }
 
     public DevicePickerDialog()
     {
@@ -38,11 +70,20 @@ public partial class DevicePickerDialog : Window
 
     private async Task LoadInitialAsync()
     {
-        // 先放已配对的
+        // 检测 USB 设备（winspool 单向）
+        var usbDevice = UsbTransport.DetectDevice();
+        if (usbDevice is { } usb)
+        {
+            _devices.Add(new DeviceItem(usb));
+        }
+
+        // 检测蓝牙设备
         var paired = PrinterDiscovery.ListPairedDevices();
         foreach (var d in paired) _devices.Add(new DeviceItem(d));
+
         UpdateEmptyHint();
-        // 自动启动一次扫描
+
+        // 自动启动蓝牙扫描
         await ScanAsync();
     }
 
@@ -60,12 +101,18 @@ public partial class DevicePickerDialog : Window
         ScanBtn.Content = "扫描中...";
         try
         {
+            // 保留 USB 设备
+            var usbItems = _devices.Where(d => d.UsbDevice is not null).ToList();
+
             var paired = PrinterDiscovery.ListPairedDevices();
             _allDevices = await PrinterDiscovery.DiscoverAsync(paired, list =>
             {
                 Dispatcher.BeginInvoke(() =>
                 {
                     _devices.Clear();
+                    // 先放 USB 设备
+                    foreach (var item in usbItems) _devices.Add(item);
+                    // 再放蓝牙设备
                     foreach (var d in list) _devices.Add(new DeviceItem(d));
                     UpdateEmptyHint();
                 });
@@ -92,8 +139,18 @@ public partial class DevicePickerDialog : Window
     {
         if (DeviceList.SelectedItem is DeviceItem item)
         {
-            SelectedDevice = item.Device;
-            DialogResult = true;
+            if (item.BtDevice is { } bt)
+            {
+                SelectedDevice = bt;
+                SelectedUsbDevice = null;
+                DialogResult = true;
+            }
+            else if (item.UsbDevice is { } usb)
+            {
+                SelectedUsbDevice = usb;
+                SelectedDevice = null;
+                DialogResult = true;
+            }
         }
     }
 
