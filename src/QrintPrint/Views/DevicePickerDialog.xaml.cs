@@ -33,7 +33,9 @@ public sealed class DeviceItem
     public DeviceItem(UsbPrinterDevice d)
         : this(
             name: d.Name,
-            subtitle: d.QueueExists ? $"已就绪 · {d.PortName}" : $"需要安装驱动 · {d.PortName}",
+            subtitle: d.QueueExists ? $"已就绪 · {d.PortName}"
+                : string.IsNullOrEmpty(d.PortName) ? "已检测到设备，未分配 USB 端口"
+                : $"需要安装驱动 · {d.PortName}",
             transportLabel: "USB")
     {
         UsbDevice = d;

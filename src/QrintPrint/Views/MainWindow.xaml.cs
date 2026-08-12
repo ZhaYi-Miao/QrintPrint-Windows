@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using QrintPrint.Bluetooth;
+using QrintPrint.HttpApi;
 using QrintPrint.Models;
 using QrintPrint.Views.Pages;
 
@@ -14,6 +15,9 @@ public partial class MainWindow : Window
     private readonly HistoryPage _historyPage = new();
     private readonly SettingsPage _settingsPage = new();
     public HomePage HomePage => _homePage;
+
+    /// <summary>局域网远程打印服务(设置页通过它查询/启停)</summary>
+    public static PrintApiServer? ApiServer { get; private set; }
 
     public MainWindow()
     {
@@ -28,6 +32,9 @@ public partial class MainWindow : Window
         {
             Dispatcher.BeginInvoke(RefreshDeviceStatusCard);
         });
+        // 按上次设置启动远程打印服务
+        ApiPrefs.Load();
+        StartApiServer();
     }
 
     private void NavList_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -81,8 +88,42 @@ public partial class MainWindow : Window
 
     protected override void OnClosing(CancelEventArgs e)
     {
+        StopApiServer();
         PrinterConnection.Instance.Dispose();
         base.OnClosing(e);
+    }
+
+    /// <summary>按 ApiPrefs 设置启动远程打印服务</summary>
+    public static void StartApiServer()
+    {
+        if (ApiServer is { IsRunning: true }) return;
+        if (!ApiPrefs.Enabled) return;
+
+        var server = new PrintApiServer(ApiPrefs.Port);
+        try
+        {
+            server.Start();
+            ApiServer = server;
+        }
+        catch (Exception ex)
+        {
+            server.Dispose();
+            System.Diagnostics.Debug.WriteLine($"远程打印服务启动失败: {ex.Message}");
+        }
+    }
+
+    /// <summary>停止远程打印服务</summary>
+    public static void StopApiServer()
+    {
+        ApiServer?.Dispose();
+        ApiServer = null;
+    }
+
+    /// <summary>重启远程打印服务(端口或开关变化后调用)</summary>
+    public static void RestartApiServer()
+    {
+        StopApiServer();
+        StartApiServer();
     }
 
     /// <summary>导航到指定页面</summary>

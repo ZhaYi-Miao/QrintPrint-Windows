@@ -9,6 +9,7 @@
     <LangVersion>latest</LangVersion>
     <RootNamespace>QrintPrint</RootNamespace>
     <AssemblyName>QrintPrint</AssemblyName>
+    <Version>1.0.3</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>icon.ico</ApplicationIcon>
   </PropertyGroup>

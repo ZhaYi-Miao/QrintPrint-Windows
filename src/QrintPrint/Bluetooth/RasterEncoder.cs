@@ -66,6 +66,26 @@ public static class RasterEncoder
     }
 
     /// <summary>
+    /// 从字节数组解码图片(远程打印 API 用),并等比缩放到 384 点宽。
+    /// </summary>
+    public static Image<Rgba32> DecodeImageFromBytes(byte[] data)
+    {
+        var image = SixLabors.ImageSharp.Image.Load<Rgba32>(data);
+        int srcWidth = image.Width;
+        int srcHeight = image.Height;
+        if (srcWidth <= 0 || srcHeight <= 0)
+        {
+            throw new InvalidOperationException($"图片尺寸异常 {srcWidth}x{srcHeight}");
+        }
+        if (srcWidth != QringProtocol.WIDTH_DOTS)
+        {
+            int targetHeight = Math.Max(1, (int)Math.Round((double)srcHeight * QringProtocol.WIDTH_DOTS / srcWidth));
+            image.Mutate(ctx => ctx.Resize(QringProtocol.WIDTH_DOTS, targetHeight));
+        }
+        return image;
+    }
+
+    /// <summary>
     /// Image → 灰度图,**按原尺寸读取,不动传入的位图**。
     ///
     /// 画布合成必须用这个:遇到宽度 ≠ 384 不应原地放大到 384,

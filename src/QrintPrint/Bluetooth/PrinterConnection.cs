@@ -17,6 +17,7 @@ using System.Windows;
 using InTheHand.Net;
 using InTheHand.Net.Bluetooth;
 using InTheHand.Net.Sockets;
+using QrintPrint.Logging;
 using QrintPrint.Models;
 
 namespace QrintPrint.Bluetooth;
@@ -140,6 +141,8 @@ public sealed class PrinterConnection : IDisposable
         _status.ConnState = ConnState.CONNECTING;
         _status.LastError = string.Empty;
 
+        AppLog.Write("BT", $"正在连接蓝牙设备 {_status.DeviceName} ({deviceAddress})");
+
         try
         {
             _client = new BluetoothClient();
@@ -152,11 +155,13 @@ public sealed class PrinterConnection : IDisposable
 
             _status.ConnState = ConnState.CONNECTED;
             CurrentTransport = TransportMode.BLUETOOTH;
+            AppLog.Write("BT", $"蓝牙连接成功: {_status.DeviceName}");
         }
         catch (Exception ex)
         {
             _status.ConnState = ConnState.DISCONNECTED;
             _status.LastError = $"连接失败: {ex.Message}";
+            AppLog.Write("BT", $"蓝牙连接失败: {ex.Message}");
             return false;
         }
 
@@ -181,25 +186,75 @@ public sealed class PrinterConnection : IDisposable
 
         try
         {
+            // 设备在但没拿到 USB 端口（驱动未加载、Windows 未识别等）
+            if (string.IsNullOrEmpty(device.PortName))
+            {
+                _status.ConnState = ConnState.DISCONNECTED;
+                _status.LastError = "未找到该设备的 USB 端口。请确认打印机已开机并插好 USB 线，若设备管理器中显示为未知设备，请更换 USB 线或接口";
+                AppLog.Write("USB", $"连接失败: 未找到 USB 端口 (DeviceId={device.DeviceId})");
+                return false;
+            }
+
+            AppLog.Write("USB", $"正在连接 USB 打印机 {device.Name}，端口 {device.PortName}");
+
             // 确保打印机队列存在
             if (!device.QueueExists)
             {
+                AppLog.Write("USB", $"打印机队列 {UsbTransport.QUEUE_NAME} 不存在，尝试自动创建（需要管理员权限）");
                 bool created = UsbTransport.CreateQueue(device.PortName);
+                AppLog.Write("USB", created
+                    ? $"打印机队列创建成功: {UsbTransport.QUEUE_NAME} @ {device.PortName}"
+                    : $"打印机队列创建失败: {UsbTransport.QUEUE_NAME} @ {device.PortName}");
                 if (!created)
                 {
                     _status.ConnState = ConnState.DISCONNECTED;
-                    _status.LastError = "创建打印机队列失败，请检查管理员权限";
+                    _status.LastError = "创建打印机队列失败。请确认弹窗中已点击“是”授予管理员权限，且打印机已开机并正确连接 USB";
                     return false;
+                }
+            }
+            else
+            {
+                // 队列已存在，但可能挂在旧 USB 口上（同型号换口会留下多个端口记录）。
+                // 队列端口必须与设备当前端口一致，否则数据发到旧端口，打印机没反应
+                string queuePort = UsbTransport.GetQueuePort();
+                if (!string.IsNullOrEmpty(queuePort) &&
+                    !string.Equals(queuePort, device.PortName, StringComparison.OrdinalIgnoreCase))
+                {
+                    AppLog.Write("USB",
+                        $"队列端口 {queuePort} 与设备端口 {device.PortName} 不一致，尝试更新队列端口");
+                    bool updated = UsbTransport.UpdateQueuePort(device.PortName);
+                    if (!updated)
+                    {
+                        // SetPrinter 改端口可能需要管理员权限；失败时回退到
+                        // 删除旧队列并用正确端口重建（printui 会弹 UAC）
+                        AppLog.Write("USB",
+                            $"更新队列端口失败，回退为删除旧队列并重建到 {device.PortName}（需要管理员权限）");
+                        UsbTransport.DeleteQueue();
+                        bool recreated = UsbTransport.CreateQueue(device.PortName);
+                        AppLog.Write("USB", recreated
+                            ? $"队列已重建到端口 {device.PortName}"
+                            : $"队列重建失败: {UsbTransport.QUEUE_NAME} @ {device.PortName}");
+                        if (!recreated)
+                        {
+                            _status.ConnState = ConnState.DISCONNECTED;
+                            _status.LastError = "更新打印机队列端口失败。请确认弹窗中已点击“是”授予管理员权限";
+                            return false;
+                        }
+                    }
                 }
             }
 
             _status.ConnState = ConnState.CONNECTED;
             CurrentTransport = TransportMode.USB;
+            // 队列可能被 Windows 标记为"脱机使用"，提前清掉，避免数据进了 spooler 却发不出去
+            UsbTransport.EnsurePrinterOnline(UsbTransport.QUEUE_NAME);
+            AppLog.Write("USB", $"USB 连接成功: {device.Name} @ {device.PortName} (队列已就绪)");
         }
         catch (Exception ex)
         {
             _status.ConnState = ConnState.DISCONNECTED;
             _status.LastError = $"USB 连接失败: {ex.Message}";
+            AppLog.Write("USB", $"USB 连接异常: {ex.Message}");
             return false;
         }
 
@@ -215,17 +270,23 @@ public sealed class PrinterConnection : IDisposable
     /// </summary>
     private async Task TryConnectBluetoothForStatusAsync()
     {
-        // 查找已配对的 BY-288 蓝牙设备
+        // 查找已配对的 BY-288 蓝牙设备（设备蓝牙名可能带 Qring / BY-288 / Beeprt）
         var paired = PrinterDiscovery.ListPairedDevices();
         var btDevice = paired.FirstOrDefault(d =>
             d.Name.Contains("BY-288", StringComparison.OrdinalIgnoreCase) ||
-            d.Name.Contains("Beeprt", StringComparison.OrdinalIgnoreCase));
+            d.Name.Contains("Beeprt", StringComparison.OrdinalIgnoreCase) ||
+            d.Name.Contains("Qring", StringComparison.OrdinalIgnoreCase));
 
         // BtDevice 是 struct，检查是否找到（DeviceId 不为空）
-        if (string.IsNullOrEmpty(btDevice.DeviceId)) return;
+        if (string.IsNullOrEmpty(btDevice.DeviceId))
+        {
+            AppLog.Write("USB", "未找到已配对的 BY-288 蓝牙设备，状态查询通道不可用（不影响 USB 打印）");
+            return;
+        }
 
         try
         {
+            AppLog.Write("USB", $"正在连接蓝牙 {btDevice.Name} ({btDevice.DeviceId}) 用于状态查询");
             _client = new BluetoothClient();
             var endpoint = new BluetoothEndPoint(
                 BluetoothAddress.Parse(btDevice.DeviceId),
@@ -236,6 +297,8 @@ public sealed class PrinterConnection : IDisposable
             // 启动后台读循环
             StartReadLoop();
 
+            AppLog.Write("USB", $"蓝牙状态通道连接成功: {btDevice.Name}");
+
             // 通过蓝牙查询一次状态
             await RefreshAllAsync();
             _ = QueryDeviceInfoAsync();
@@ -243,9 +306,10 @@ public sealed class PrinterConnection : IDisposable
             // 启动状态轮询
             if (_foreground) StartPolling();
         }
-        catch
+        catch (Exception ex)
         {
             // 蓝牙连接失败不影响 USB 打印，状态会显示 "—"
+            AppLog.Write("USB", $"蓝牙状态通道连接失败: {ex.Message}（状态显示 —，不影响 USB 打印）");
             _client?.Dispose();
             _client = null;
             _stream = null;
@@ -269,6 +333,8 @@ public sealed class PrinterConnection : IDisposable
 
         _status.ConnState = ConnState.DISCONNECTED;
         _status.Reset();
+
+        AppLog.Write("BT", $"连接已断开: {_status.DeviceName}");
     }
 
     /// <summary>冷启动静默重连上次用过的设备。失败不弹任何提示</summary>
@@ -282,6 +348,7 @@ public sealed class PrinterConnection : IDisposable
         string name = ResolveName(deviceId);
         if (!PrinterDiscovery.MatchesDeviceFilter(name)) return;
 
+        AppLog.Write("BT", $"自动重连上次设备 {name} ({deviceId})");
         await ConnectAsync(deviceId, name);
     }
 
@@ -464,6 +531,7 @@ public sealed class PrinterConnection : IDisposable
         if (_busy) return;
         _status.Model = await QueryStringAsync(QringProtocol.CMD_MODEL);
         _status.Firmware = await QueryStringAsync(QringProtocol.CMD_FW_VERSION);
+        AppLog.Write("BT", $"设备信息: 型号={_status.Model} 固件={_status.Firmware}");
     }
 
     /// <summary>查一轮状态 + 电量,写回全局状态</summary>
@@ -473,11 +541,13 @@ public sealed class PrinterConnection : IDisposable
         if (status is { } s)
         {
             _status.ApplyQringStatus(s);
+            AppLog.Write("BT", $"收到状态 0x{s.Raw:X2}: {QringProtocol.FaultMessage(s) ?? "正常"}");
         }
         var battery = await QueryBatteryAsync();
         if (battery is { } b)
         {
             _status.BatteryPercent = b;
+            AppLog.Write("BT", $"收到电量: {b}%");
         }
     }
 
@@ -515,9 +585,16 @@ public sealed class PrinterConnection : IDisposable
         if (!IsAlive()) return new PrintResult(false, "打印机未连接");
         if (_busy) return new PrintResult(false, "上一个打印任务还没结束");
 
+        AppLog.Write("PRINT",
+            $"打印开始: {raster.WidthBytes * 8}×{raster.Height} 点, 数据 {raster.Data.Length} 字节, 浓度 {(thickness ?? DefaultThickness).ToString()}, 通道 {(CurrentTransport == TransportMode.USB ? "USB" : "蓝牙")}");
+
         // 打印前检查状态（蓝牙/WinUSB 会实际查询，USB winspool 直接放行）
         string? fault = await PreflightCheckAsync();
-        if (fault is not null) return new PrintResult(false, fault);
+        if (fault is not null)
+        {
+            AppLog.Write("PRINT", $"打印前体检拦截: {fault}");
+            return new PrintResult(false, fault);
+        }
 
         _busy = true;
         // 打印期间停掉轮询,别让状态查询的字节混进打印数据流
@@ -557,6 +634,7 @@ public sealed class PrinterConnection : IDisposable
             {
                 _status.LastError = result.Message;
             }
+            AppLog.Write("PRINT", result.Ok ? "打印完成 (蓝牙, ACK 确认)" : $"打印失败: {result.Message}");
             return result;
         }
         finally
@@ -625,9 +703,11 @@ public sealed class PrinterConnection : IDisposable
             if (written <= 0)
             {
                 _status.LastError = "USB 发送失败";
+                AppLog.Write("PRINT", $"USB 发送失败 (写入了 {written} 字节)");
                 return new PrintResult(false, "USB 发送失败");
             }
 
+            AppLog.Write("PRINT", $"USB 已发送 {written}/{jobData.Length} 字节, 打印完成");
             // USB 模式无法等待 ACK，假设发送成功即打印成功
             return new PrintResult(true, "打印完成");
         }
