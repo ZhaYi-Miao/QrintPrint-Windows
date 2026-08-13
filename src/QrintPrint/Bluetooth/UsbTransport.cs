@@ -26,6 +26,9 @@ public readonly record struct UsbPrinterDevice(
     string PortName,
     bool QueueExists);
 
+/// <summary>已安装的打印机队列信息（“显示所有打印机”时列出）</summary>
+public readonly record struct PrinterQueueInfo(string Name, string PortName);
+
 /// <summary>
 /// USB 打印机传输层。
 /// 负责设备检测、打印机队列管理、通过 winspool.drv 发送数据。
@@ -222,6 +225,134 @@ public static class UsbTransport
     }
 
     /// <summary>
+    /// 列出系统里所有已安装的打印机队列（自动查找失败时让用户手动选择）。
+    /// 手动选择的队列不再局限于 BY-288：可能选到 IPP 驱动的
+    /// "Beeprt BY-288 (ESC/POS 58mm)" 或其他任何队列。
+    /// </summary>
+    public static List<PrinterQueueInfo> ListAllPrinterQueues()
+    {
+        var result = new List<PrinterQueueInfo>();
+        try
+        {
+            using var searcher = new ManagementObjectSearcher(
+                "SELECT Name, PortName FROM Win32_Printer");
+            foreach (ManagementObject mo in searcher.Get())
+            {
+                string name = mo["Name"]?.ToString() ?? "";
+                if (string.IsNullOrEmpty(name)) continue;
+                result.Add(new PrinterQueueInfo(name, mo["PortName"]?.ToString() ?? ""));
+            }
+        }
+        catch
+        {
+            // WMI 查询失败
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// 检查 USB 设备是否仍存在于系统中（Win32_PnPEntity）。
+    /// 用于 USB 模式下检测“打印机被拔掉”，避免界面一直显示已连接。
+    /// 查询失败时返回 true（不误报断开）。
+    /// </summary>
+    public static bool IsDevicePresent(string deviceId)
+    {
+        if (string.IsNullOrEmpty(deviceId)) return false;
+        try
+        {
+            // 不在 WQL 里写 DeviceID = '...' 精确匹配 —— 反斜杠会被 WMI 引擎
+            // 当转义字符处理，抛出"无效查询"异常导致检测失效（且被误判为存在）。
+            // 改为按 VID_ 子串缩小范围，再在内存里做精确比较，完全避开转义问题。
+            using var searcher = new ManagementObjectSearcher(
+                "SELECT DeviceID FROM Win32_PnPEntity WHERE DeviceID LIKE '%VID_%'");
+            foreach (ManagementObject mo in searcher.Get())
+            {
+                if (string.Equals(mo["DeviceID"]?.ToString(), deviceId, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            AppLog.Write("USB", $"设备存在性检测: {deviceId} 未找到（打印机可能已拔掉）");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            // 查询失败不误报断开
+            AppLog.Write("USB", $"设备存在性检测异常: {ex.Message}（按存在处理，不误报）");
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// 查询指定打印机队列当前绑定的端口名（如 USB005）。
+    /// queueName 为空时用默认队列名。
+    /// </summary>
+    public static string GetQueuePort(string queueName = QUEUE_NAME)
+    {
+        try
+        {
+            using var searcher = new ManagementObjectSearcher(
+                $"SELECT PortName FROM Win32_Printer WHERE Name = '{queueName.Replace("'", "''")}'");
+            foreach (ManagementObject mo in searcher.Get())
+                return mo["PortName"]?.ToString() ?? "";
+        }
+        catch { }
+        return "";
+    }
+
+    /// <summary>
+    /// 从 USB Monitor 端口注册表反查该端口登记的 USB 设备完整实例 ID
+    /// （如 USB\VID_09C6&PID_0288\5&2A2B26F7&0&4）。
+    /// 手动选择队列时 DeviceId 只有队列名，拿不到这个，拔线检测会失效。
+    /// </summary>
+    public static string GetDeviceIdForPort(string portName)
+    {
+        try
+        {
+            using var portsKey = Registry.LocalMachine.OpenSubKey(
+                @"SYSTEM\CurrentControlSet\Control\Print\Monitors\USB Monitor\Ports");
+            if (portsKey is null) return "";
+            using var portKey = portsKey.OpenSubKey(portName);
+            if (portKey is null) return "";
+
+            // 默认值优先，再遍历所有值，找含 VID_ 的完整实例 ID
+            if (portKey.GetValue(null) is string def &&
+                def.Contains("VID_", StringComparison.OrdinalIgnoreCase))
+                return def;
+            foreach (string valueName in portKey.GetValueNames())
+            {
+                if (string.IsNullOrEmpty(valueName)) continue; // 默认值已检查
+                if (portKey.GetValue(valueName) is string s &&
+                    s.Contains("VID_", StringComparison.OrdinalIgnoreCase))
+                    return s;
+            }
+        }
+        catch { }
+        return "";
+    }
+
+    /// <summary>
+    /// 检查 USB Monitor 端口登记是否仍存在。
+    /// 设备被拔掉后 usbmon 会删除该端口登记（打印机队列会变成“端口已删除”）。
+    /// 端口为空或查询失败时返回 true（不误报断开）。
+    /// </summary>
+    public static bool IsPortPresent(string portName)
+    {
+        if (string.IsNullOrWhiteSpace(portName)) return true;
+        try
+        {
+            using var portsKey = Registry.LocalMachine.OpenSubKey(
+                @"SYSTEM\CurrentControlSet\Control\Print\Monitors\USB Monitor\Ports");
+            bool present = portsKey?.OpenSubKey(portName) is not null;
+            if (!present)
+                AppLog.Write("USB", $"端口登记检测: {portName} 已从 USB Monitor 注册表移除（打印机可能已拔掉）");
+            return present;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    /// <summary>
     /// 找到 USB 设备对应的打印机端口名（如 USB004）。
     /// 优先读 USB Monitor 端口注册表 —— usbmon.dll 在打印机一插上就会登记端口，
     /// 不需要系统里已经安装过打印机队列；队列查询只作兜底。
@@ -234,6 +365,7 @@ public static class UsbTransport
             return port;
 
         // 2) 兜底: 已安装队列上的 USB 端口（兼容部分驱动未登记注册表的情况）
+        AppLog.Write("USB", $"USB Monitor 注册表未找到端口，尝试从已安装队列查找");
         port = FindUsbPortFromInstalledQueues(usbDeviceId);
         if (!string.IsNullOrEmpty(port))
             return port;
@@ -277,17 +409,40 @@ public static class UsbTransport
                     return portName;
             }
 
-            // 第二轮: 兜底 VID/PID 子串（兼容部分系统只存了设备路径）
+            // 第二轮到这就说明: USB Monitor 里没有登记当前设备实例对应的端口。
+            // 可能是设备换过 USB 口/驱动重装后实例 ID 变了，也可能是 usbmon 尚未登记。
+            // 记录这个事实，便于远程排查端口选择是否正确。
+            AppLog.Write("USB", $"USB Monitor 端口注册表未精确匹配到设备实例 {usbDeviceId}，走 VID/PID 兜底");
+
+            // 第二轮: 兜底 VID/PID 子串（兼容部分系统只存了设备路径）。
+            // 同一台打印机在不同 USB 口插过会留下多个含相同 VID/PID 的端口记录，
+            // 直接返回第一个（按字母序）可能选到过期端口。必须选最近登记的
+            // 端口（IppStartTime 最大），它才最可能是设备当前所在的口。
+            string? bestPort = null;
+            long bestTime = long.MinValue;
+            var candidates = new List<string>();
             foreach (string portName in portsKey.GetSubKeyNames())
             {
                 if (!portName.StartsWith("USB", StringComparison.OrdinalIgnoreCase))
                     continue;
 
                 using var portKey = portsKey.OpenSubKey(portName);
-                if (portKey is not null &&
-                    KeyValueMatches(portKey, s => s.Contains(vidPid, StringComparison.OrdinalIgnoreCase)))
-                    return portName;
+                if (portKey is null) continue;
+                if (!KeyValueMatches(portKey, s => s.Contains(vidPid, StringComparison.OrdinalIgnoreCase)))
+                    continue;
+
+                long ts = ReadIppStartTime(portKey);
+                candidates.Add($"{portName}(登记时间={ts})");
+                if (ts > bestTime)
+                {
+                    bestTime = ts;
+                    bestPort = portName;
+                }
             }
+            // 候选端口列表写入日志，方便远程判断是否有多端口/选中的是不是最新的
+            if (candidates.Count > 0)
+                AppLog.Write("USB", $"VID/PID 兜底候选端口: {string.Join(", ", candidates)}，选中 {bestPort ?? "(无)"}");
+            return bestPort ?? "";
         }
         catch
         {
@@ -311,6 +466,23 @@ public static class UsbTransport
                 return true;
         }
         return false;
+    }
+
+    /// <summary>
+    /// 读取 usbmon 端口键的 IppStartTime（设备登记的 FILETIME）。
+    /// 用于多端口都含相同 VID/PID 时选出最近登记的那一个。
+    /// </summary>
+    private static long ReadIppStartTime(RegistryKey portKey)
+    {
+        try
+        {
+            object? v = portKey.GetValue("IppStartTime");
+            if (v is long l) return l;
+            if (v is ulong ul && ul <= long.MaxValue) return (long)ul;
+            if (v is byte[] b && b.Length >= 8) return BitConverter.ToInt64(b, 0);
+        }
+        catch { }
+        return 0;
     }
 
     /// <summary>兜底: 从已安装的打印机队列里找登记了目标设备的 USB 端口</summary>
@@ -595,16 +767,17 @@ public static class UsbTransport
 
     /// <summary>
     /// 通过 winspool.drv 发送原始字节到打印机。
+    /// queueName 默认为 BY-288 专用队列，也可指定任意队列（手动选择设备时）。
     /// </summary>
-    public static int SendRaw(byte[] data, string jobName = "QrintPrint Job")
+    public static int SendRaw(byte[] data, string queueName = QUEUE_NAME, string jobName = "QrintPrint Job")
     {
         // 发送前先确保队列不在"脱机使用"状态
-        EnsurePrinterOnline(QUEUE_NAME);
+        EnsurePrinterOnline(queueName);
 
         IntPtr hPrinter;
-        if (!OpenPrinterW(QUEUE_NAME, out hPrinter, IntPtr.Zero))
+        if (!OpenPrinterW(queueName, out hPrinter, IntPtr.Zero))
         {
-            System.Diagnostics.Debug.WriteLine($"UsbTransport: OpenPrinter failed ({Marshal.GetLastWin32Error()})");
+            System.Diagnostics.Debug.WriteLine($"UsbTransport: OpenPrinter({queueName}) failed ({Marshal.GetLastWin32Error()})");
             return -1;
         }
 
@@ -619,13 +792,38 @@ public static class UsbTransport
 
             if (!StartDocPrinterW(hPrinter, 1, docInfo))
             {
-                System.Diagnostics.Debug.WriteLine($"UsbTransport: StartDocPrinter failed ({Marshal.GetLastWin32Error()})");
+                AppLog.Write("USB", $"StartDocPrinter 失败 (win32 错误 {Marshal.GetLastWin32Error()})");
                 return -1;
             }
 
-            StartPagePrinter(hPrinter);
-            WritePrinter(hPrinter, data, data.Length, out int written);
-            EndPagePrinter(hPrinter);
+            if (!StartPagePrinter(hPrinter))
+            {
+                AppLog.Write("USB", $"StartPagePrinter 失败 (win32 错误 {Marshal.GetLastWin32Error()})");
+                EndDocPrinter(hPrinter);
+                return -1;
+            }
+
+            if (!WritePrinter(hPrinter, data, data.Length, out int written))
+            {
+                // WritePrinter 失败说明数据没能提交给 spooler，队列里会留下一个错误任务
+                AppLog.Write("USB", $"WritePrinter 失败 (win32 错误 {Marshal.GetLastWin32Error()})");
+                EndPagePrinter(hPrinter);
+                EndDocPrinter(hPrinter);
+                return -1;
+            }
+
+            if (written != data.Length)
+            {
+                AppLog.Write("USB", $"WritePrinter 只写入了 {written}/{data.Length} 字节，发送不完整");
+                EndPagePrinter(hPrinter);
+                EndDocPrinter(hPrinter);
+                return -1;
+            }
+
+            if (!EndPagePrinter(hPrinter))
+            {
+                AppLog.Write("USB", $"EndPagePrinter 失败 (win32 错误 {Marshal.GetLastWin32Error()})");
+            }
             EndDocPrinter(hPrinter);
 
             return written;
@@ -637,9 +835,9 @@ public static class UsbTransport
     }
 
     /// <summary>发送完整的打印任务</summary>
-    public static bool SendPrintJob(byte[] jobData, string jobName = "QrintPrint Job")
+    public static bool SendPrintJob(byte[] jobData, string queueName = QUEUE_NAME, string jobName = "QrintPrint Job")
     {
-        int written = SendRaw(jobData, jobName);
+        int written = SendRaw(jobData, queueName, jobName);
         return written > 0;
     }
 }

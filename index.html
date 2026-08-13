@@ -1,0 +1,1305 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QrintPrint 远程打印</title>
+<style>
+  :root {
+    --primary: #0b7cff;
+    --primary-dark: #0866d8;
+    --primary-light: #eaf3ff;
+    --bg: #f3f4f6;
+    --card: #ffffff;
+    --border: #e3e6eb;
+    --text: #1f2329;
+    --text-secondary: #6b7280;
+    --success: #16a34a;
+    --success-bg: #e8f8ee;
+    --danger: #dc2626;
+    --danger-bg: #fdecec;
+    --warning: #d97706;
+    --warning-bg: #fdf3e3;
+    --radius: 10px;
+    --shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    font-size: 14px;
+  }
+  .container { max-width: 980px; margin: 0 auto; padding: 20px 16px 60px; }
+
+  /* 顶栏 */
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px; padding: 4px 0;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-logo {
+    width: 40px; height: 40px; border-radius: 10px;
+    background: linear-gradient(135deg, #0b7cff, #5aa7ff);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 20px; font-weight: 700;
+  }
+  .brand h1 { font-size: 20px; font-weight: 700; letter-spacing: .3px; }
+  .brand p { font-size: 12px; color: var(--text-secondary); line-height: 1.4; }
+  .conn-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 14px; border-radius: 999px; font-size: 13px;
+    background: var(--card); border: 1px solid var(--border); color: var(--text-secondary);
+  }
+  .conn-pill .dot { width: 9px; height: 9px; border-radius: 50%; background: #c3c8d0; }
+  .conn-pill.online .dot { background: var(--success); box-shadow: 0 0 0 3px rgba(22,163,74,.15); }
+  .conn-pill.offline .dot { background: var(--danger); box-shadow: 0 0 0 3px rgba(220,38,38,.15); }
+
+  /* 卡片 */
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+    padding: 18px 20px; margin-bottom: 16px;
+  }
+  .card-title {
+    font-size: 15px; font-weight: 600; margin-bottom: 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .card-title .hint { font-size: 12px; font-weight: 400; color: var(--text-secondary); }
+
+  /* 表单 */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; }
+  .form-grid .full { grid-column: 1 / -1; }
+  .form-row { display: flex; flex-direction: column; gap: 6px; }
+  .form-row label { font-size: 13px; color: var(--text-secondary); }
+  .form-row label .req { color: var(--danger); margin-left: 2px; }
+  input[type="text"], input[type="password"], input[type="number"], textarea, select {
+    width: 100%; padding: 8px 12px;
+    border: 1px solid var(--border); border-radius: 8px;
+    font-size: 14px; font-family: inherit; color: var(--text);
+    background: #fff; outline: none; transition: border-color .15s, box-shadow .15s;
+  }
+  input:focus, textarea:focus, select:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(11,124,255,.12);
+  }
+  textarea { resize: vertical; min-height: 120px; line-height: 1.6; }
+  textarea.code { font-family: "Cascadia Code", Consolas, "Courier New", monospace; font-size: 13px; }
+
+  .check-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
+  .check-row input[type="checkbox"] {
+    width: 16px; height: 16px; accent-color: var(--primary); flex-shrink: 0;
+  }
+  .check-row span { font-size: 14px; }
+  .check-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 2px 14px; }
+
+  /* 按钮 */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 9px 20px; border: 1px solid var(--border); border-radius: 8px;
+    background: #fff; color: var(--text); font-size: 14px; font-weight: 500;
+    cursor: pointer; transition: all .15s; font-family: inherit; line-height: 1.4;
+  }
+  .btn:hover { border-color: #c9ced6; background: #fafafa; }
+  .btn:disabled { opacity: .55; cursor: not-allowed; }
+  .btn-primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .btn-primary:hover:not(:disabled) { background: var(--primary-dark); border-color: var(--primary-dark); }
+  .btn-danger { background: var(--danger-bg); border-color: #f3c6c6; color: var(--danger); }
+  .btn-danger:hover:not(:disabled) { background: #fadcdc; }
+  .btn-sm { padding: 5px 12px; font-size: 13px; }
+  .btn-block { width: 100%; padding: 11px; font-size: 15px; }
+  .btn-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+  /* Tabs */
+  .tabs {
+    display: flex; gap: 4px; flex-wrap: wrap;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 6px; margin-bottom: 16px;
+  }
+  .tab-btn {
+    padding: 8px 16px; border: none; background: transparent;
+    border-radius: 7px; font-size: 14px; color: var(--text-secondary);
+    cursor: pointer; font-family: inherit; transition: all .15s;
+  }
+  .tab-btn:hover { background: #f3f4f6; color: var(--text); }
+  .tab-btn.active { background: var(--primary-light); color: var(--primary); font-weight: 600; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* 状态卡片 */
+  .status-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+  .stat-item {
+    border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px;
+    background: #fafbfc;
+  }
+  .stat-item .label { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+  .stat-item .value { font-size: 15px; font-weight: 600; }
+  .stat-item .value.good { color: var(--success); }
+  .stat-item .value.bad { color: var(--danger); }
+  .stat-item .value.warn { color: var(--warning); }
+  .stat-item .value.muted { color: var(--text-secondary); font-weight: 400; }
+
+  /* Toast */
+  .toast-wrap {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    display: flex; flex-direction: column; gap: 8px; z-index: 100; align-items: center;
+  }
+  .toast {
+    padding: 10px 20px; border-radius: 8px; font-size: 14px;
+    color: #fff; box-shadow: 0 4px 16px rgba(0,0,0,.18);
+    opacity: 0; transform: translateY(8px); transition: all .25s;
+    max-width: 90vw; text-align: center;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.success { background: var(--success); }
+  .toast.error { background: var(--danger); }
+  .toast.info { background: #374151; }
+
+  /* 图片预览 */
+  .img-preview {
+    margin-top: 12px; display: none;
+    border: 1px solid var(--border); border-radius: 8px; padding: 10px;
+    background: #fafbfc; text-align: center;
+  }
+  .img-preview img { max-width: 100%; max-height: 240px; border-radius: 4px; }
+  .img-preview .meta { font-size: 12px; color: var(--text-secondary); margin-top: 6px; }
+  .img-preview.show { display: block; }
+
+  /* 表格预览 */
+  .table-preview { margin-top: 12px; overflow-x: auto; }
+  .table-preview table { border-collapse: collapse; font-size: 13px; width: 100%; }
+  .table-preview th, .table-preview td {
+    border: 1px solid var(--border); padding: 6px 10px; text-align: left; white-space: nowrap;
+  }
+  .table-preview th { background: var(--primary-light); font-weight: 600; }
+  .table-preview .empty-note { color: var(--text-secondary); font-size: 12px; padding: 8px 0; }
+
+  /* 实时打印效果预览 */
+  .live-preview {
+    margin-top: 14px; display: none;
+    border: 1px solid var(--border); border-radius: 8px; padding: 12px;
+    background: #fafbfc; text-align: center;
+  }
+  .live-preview.show { display: block; }
+  .live-preview .lp-label {
+    font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .live-preview .lp-loading {
+    display: none; font-size: 12px; color: var(--text-secondary);
+  }
+  .live-preview.loading .lp-loading { display: inline; }
+  .live-preview .lp-img {
+    display: inline-block; max-width: 100%; max-height: 480px; overflow: auto;
+    border: 1px solid #e5e7eb; border-radius: 4px; background: #fff; padding: 8px;
+  }
+  .live-preview .lp-img img { display: block; max-width: 100%; height: auto; }
+  .live-preview .lp-empty {
+    display: none; font-size: 13px; color: var(--text-secondary); padding: 16px 0;
+  }
+  .live-preview.empty .lp-empty { display: block; }
+  .live-preview .lp-error {
+    display: none; font-size: 12px; color: var(--danger); padding: 8px 0;
+  }
+  .live-preview.error .lp-error { display: block; }
+
+  /* 课程表网格 */
+  .schedule-grid { display: grid; gap: 6px; grid-template-columns: 1fr; }
+  .sched-row { display: grid; grid-template-columns: 46px repeat(7, 1fr); gap: 6px; align-items: center; }
+  .sched-row .slot-label { font-size: 12px; color: var(--text-secondary); text-align: center; }
+  .sched-row input {
+    padding: 6px 8px; font-size: 13px; text-align: center;
+    border: 1px solid var(--border); border-radius: 6px;
+  }
+  .sched-head { display: grid; grid-template-columns: 46px repeat(7, 1fr); gap: 6px; }
+  .sched-head div { font-size: 12px; color: var(--text-secondary); text-align: center; font-weight: 600; }
+
+  .file-drop {
+    border: 1.5px dashed #c9ced6; border-radius: 8px; padding: 22px;
+    text-align: center; color: var(--text-secondary); cursor: pointer;
+    transition: all .15s; font-size: 13px;
+  }
+  .file-drop:hover, .file-drop.drag { border-color: var(--primary); background: var(--primary-light); color: var(--primary); }
+  .file-drop .fname { color: var(--text); font-weight: 600; margin-top: 4px; word-break: break-all; }
+
+  .divider { height: 1px; background: var(--border); margin: 16px 0; }
+  .muted { color: var(--text-secondary); }
+  .mt-8 { margin-top: 8px; } .mt-12 { margin-top: 12px; } .mb-4 { margin-bottom: 4px; }
+  .flex-between { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+
+  @media (max-width: 640px) {
+    .form-grid { grid-template-columns: 1fr; }
+    .sched-row, .sched-head { grid-template-columns: 40px repeat(7, 1fr); }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- 顶栏 -->
+  <div class="header">
+    <div class="brand">
+      <div class="brand-logo">Q</div>
+      <div>
+        <h1>QrintPrint 远程打印</h1>
+        <p>局域网远程打印控制台</p>
+      </div>
+    </div>
+    <div class="conn-pill" id="connPill">
+      <span class="dot"></span><span id="connText">未连接</span>
+    </div>
+  </div>
+
+  <!-- 配置区 -->
+  <div class="card">
+    <div class="card-title">服务连接 <span class="hint">配置保存在本地浏览器</span></div>
+    <div class="form-grid">
+      <div class="form-row">
+        <label for="baseUrl">服务地址 <span class="req">*</span></label>
+        <input type="text" id="baseUrl" placeholder="http://192.168.1.100:8512">
+      </div>
+      <div class="form-row">
+        <label for="token">API Token <span class="req">*</span></label>
+        <input type="password" id="token" placeholder="在 QrintPrint 设置页 API Key 管理中创建" autocomplete="off">
+      </div>
+    </div>
+    <div class="btn-row mt-12">
+      <button class="btn btn-primary" id="btnTest">测试连接</button>
+      <button class="btn" id="btnSave">保存配置</button>
+      <span class="muted" id="cfgResult"></span>
+    </div>
+  </div>
+
+  <!-- Tab 导航 -->
+  <div class="tabs" id="tabs">
+    <button class="tab-btn active" data-tab="status">状态</button>
+    <button class="tab-btn" data-tab="text">文本</button>
+    <button class="tab-btn" data-tab="image">图片</button>
+    <button class="tab-btn" data-tab="markdown">Markdown</button>
+    <button class="tab-btn" data-tab="barcode">条码</button>
+    <button class="tab-btn" data-tab="doc">Word / PDF</button>
+    <button class="tab-btn" data-tab="table">表格</button>
+    <button class="tab-btn" data-tab="schedule">课程表</button>
+  </div>
+
+  <!-- 状态 -->
+  <div class="tab-panel active" id="panel-status">
+    <div class="card">
+      <div class="flex-between">
+        <div class="card-title" style="margin-bottom:0">打印机状态</div>
+        <button class="btn btn-sm" id="btnRefreshStatus">刷新</button>
+      </div>
+      <div class="divider"></div>
+      <div class="status-grid" id="statusGrid">
+        <div class="stat-item"><div class="label">连接状态</div><div class="value muted" data-k="connected">—</div></div>
+        <div class="stat-item"><div class="label">连接方式</div><div class="value muted" data-k="mode">—</div></div>
+        <div class="stat-item"><div class="label">设备名称</div><div class="value muted" data-k="deviceName">—</div></div>
+        <div class="stat-item"><div class="label">电量</div><div class="value muted" data-k="batteryLabel">—</div></div>
+        <div class="stat-item"><div class="label">纸张状态</div><div class="value muted" data-k="paperState">—</div></div>
+        <div class="stat-item"><div class="label">硬件状态</div><div class="value muted" data-k="hardwareState">—</div></div>
+        <div class="stat-item"><div class="label">打印浓度</div><div class="value muted" data-k="thickness">—</div></div>
+        <div class="stat-item"><div class="label">打印中</div><div class="value muted" data-k="busy">—</div></div>
+      </div>
+      <div class="mt-12 muted" id="statusMsg" style="font-size:13px"></div>
+    </div>
+  </div>
+
+  <!-- 文本 -->
+  <div class="tab-panel" id="panel-text">
+    <div class="card">
+      <div class="card-title">文本打印</div>
+      <div class="form-grid">
+        <div class="form-row full">
+          <label for="t-content">打印内容 <span class="req">*</span></label>
+          <textarea id="t-content" placeholder="输入要打印的文本，例如：&#10;Hello QrintPrint!&#10;公式: $E=mc^2$（需开启公式模式）"></textarea>
+        </div>
+        <div class="form-row">
+          <label for="t-fontSize">字号（像素）</label>
+          <input type="number" id="t-fontSize" value="24" min="8" max="80">
+        </div>
+        <div class="form-row">
+          <label for="t-lineSpacing">行间距（像素）</label>
+          <input type="number" id="t-lineSpacing" value="6" min="0" max="40">
+        </div>
+        <div class="form-row">
+          <label for="t-letterSpacing">字间距（像素）</label>
+          <input type="number" id="t-letterSpacing" value="0" min="0" max="20">
+        </div>
+        <div class="form-row">
+          <label for="t-margin">左右边距（像素）</label>
+          <input type="number" id="t-margin" value="8" min="0" max="80">
+        </div>
+        <div class="form-row full">
+          <label>字体样式</label>
+          <div class="check-grid">
+            <label class="check-row"><input type="checkbox" id="t-bold"><span>加粗</span></label>
+            <label class="check-row"><input type="checkbox" id="t-italic"><span>斜体</span></label>
+            <label class="check-row"><input type="checkbox" id="t-underline"><span>下划线</span></label>
+            <label class="check-row"><input type="checkbox" id="t-formula"><span>公式模式（$...$ 渲染为 LaTeX）</span></label>
+          </div>
+        </div>
+        <div class="form-row" id="t-formulaScaleRow">
+          <label for="t-formulaScale">公式缩放（%）</label>
+          <input type="number" id="t-formulaScale" value="100" min="50" max="200">
+        </div>
+      </div>
+      <div class="live-preview" id="lp-text">
+        <div class="lp-label">实时预览<span class="lp-loading">渲染中…</span></div>
+        <div class="lp-img"><img alt="预览"></div>
+        <div class="lp-empty">输入内容后自动显示打印效果</div>
+        <div class="lp-error" id="lp-text-error"></div>
+      </div>
+      <button class="btn btn-primary btn-block mt-12" id="btnText">打印文本</button>
+    </div>
+  </div>
+
+  <!-- 图片 -->
+  <div class="tab-panel" id="panel-image">
+    <div class="card">
+      <div class="card-title">图片打印 <span class="hint">支持 PNG / JPG / BMP，大小不超过 10MB</span></div>
+      <div class="form-row full">
+        <label>选择图片 <span class="req">*</span></label>
+        <div class="file-drop" id="imgDrop">
+          <div>点击选择或拖拽图片到此处</div>
+          <div class="fname" id="imgName"></div>
+        </div>
+        <input type="file" id="imgFile" accept="image/*" style="display:none">
+        <div class="img-preview" id="imgPreview"><img id="imgPreviewImg" alt=""><div class="meta" id="imgPreviewMeta"></div></div>
+      </div>
+      <div class="form-grid mt-12">
+        <div class="form-row">
+          <label for="i-dither">抖动算法</label>
+          <select id="i-dither">
+            <option value="floyd">Floyd-Steinberg（floyd）</option>
+            <option value="atkinson">Atkinson（atkinson）</option>
+            <option value="none">无 / 直接二值化（none）</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label for="i-thickness">打印浓度（1-5）</label>
+          <input type="number" id="i-thickness" value="" min="1" max="5" placeholder="默认">
+        </div>
+        <div class="form-row" id="i-thresholdRow">
+          <label for="i-threshold">二值化阈值（0-255）</label>
+          <input type="number" id="i-threshold" value="128" min="0" max="255">
+        </div>
+      </div>
+      <div class="live-preview" id="lp-image">
+        <div class="lp-label">实时预览<span class="lp-loading">渲染中…</span></div>
+        <div class="lp-img"><img alt="预览"></div>
+        <div class="lp-empty">选择图片后自动显示二值化效果</div>
+        <div class="lp-error" id="lp-image-error"></div>
+      </div>
+      <button class="btn btn-primary btn-block mt-12" id="btnImage">打印图片</button>
+    </div>
+  </div>
+
+  <!-- Markdown -->
+  <div class="tab-panel" id="panel-markdown">
+    <div class="card">
+      <div class="card-title">Markdown 打印 <span class="hint">支持 # 标题 / 粗体 / 斜体 / 行内代码 / - 列表 / &gt; 引用 / --- 分割线</span></div>
+      <div class="form-grid">
+        <div class="form-row full">
+          <label for="m-content">Markdown 内容 <span class="req">*</span></label>
+          <textarea id="m-content" class="code" placeholder="# 购物清单&#10;- 牛奶&#10;- 鸡蛋&#10;&#10;&gt; 记得打印后关打印机"></textarea>
+        </div>
+        <div class="form-row">
+          <label for="m-fontSize">基础字号（像素）</label>
+          <input type="number" id="m-fontSize" value="24" min="8" max="80">
+        </div>
+        <div class="form-row">
+          <label for="m-margin">左右边距（像素）</label>
+          <input type="number" id="m-margin" value="8" min="0" max="80">
+        </div>
+      </div>
+      <div class="live-preview" id="lp-markdown">
+        <div class="lp-label">实时预览<span class="lp-loading">渲染中…</span></div>
+        <div class="lp-img"><img alt="预览"></div>
+        <div class="lp-empty">输入内容后自动显示打印效果</div>
+        <div class="lp-error" id="lp-markdown-error"></div>
+      </div>
+      <button class="btn btn-primary btn-block mt-12" id="btnMarkdown">打印 Markdown</button>
+    </div>
+  </div>
+
+  <!-- 条码 -->
+  <div class="tab-panel" id="panel-barcode">
+    <div class="card">
+      <div class="card-title">条码 / 二维码打印</div>
+      <div class="form-grid">
+        <div class="form-row">
+          <label for="b-content">条码内容 <span class="req">*</span></label>
+          <input type="text" id="b-content" placeholder="如 https://example.com 或 6901234567892">
+        </div>
+        <div class="form-row">
+          <label for="b-codeType">码制</label>
+          <select id="b-codeType">
+            <option value="QR_CODE">QR Code（二维码）</option>
+            <option value="EAN_13">EAN-13（一维）</option>
+            <option value="EAN_8">EAN-8（一维）</option>
+            <option value="UPC_A">UPC-A（一维）</option>
+            <option value="UPC_E">UPC-E（一维）</option>
+            <option value="ITF">ITF-14（一维）</option>
+            <option value="CODE_128">Code 128（一维）</option>
+            <option value="CODE_39">Code 39（一维）</option>
+            <option value="CODE_93">Code 93（一维）</option>
+            <option value="CODABAR">Codabar（一维）</option>
+            <option value="DATA_MATRIX">Data Matrix（二维）</option>
+            <option value="PDF_417">PDF417（二维）</option>
+            <option value="AZTEC">Aztec（二维）</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label for="b-width">宽度（像素，最小 50）</label>
+          <input type="number" id="b-width" value="384" min="50" max="1024">
+        </div>
+        <div class="form-row">
+          <label for="b-height">高度（像素，最小 30）</label>
+          <input type="number" id="b-height" value="384" min="30" max="1024">
+        </div>
+        <div class="form-row">
+          <label for="b-margin">静区（像素）</label>
+          <input type="number" id="b-margin" value="1" min="0" max="20">
+        </div>
+        <div class="form-row">
+          <label for="b-thickness">打印浓度（1-5）</label>
+          <input type="number" id="b-thickness" value="" min="1" max="5" placeholder="默认">
+        </div>
+      </div>
+      <div class="live-preview" id="lp-barcode">
+        <div class="lp-label">实时预览<span class="lp-loading">渲染中…</span></div>
+        <div class="lp-img"><img alt="预览"></div>
+        <div class="lp-empty">输入条码内容后自动显示</div>
+        <div class="lp-error" id="lp-barcode-error"></div>
+      </div>
+      <button class="btn btn-primary btn-block mt-12" id="btnBarcode">打印条码</button>
+    </div>
+  </div>
+
+  <!-- Word / PDF -->
+  <div class="tab-panel" id="panel-doc">
+    <div class="card">
+      <div class="card-title" id="docTitle">Word 文档打印</div>
+      <div class="flex-between" style="margin-bottom:12px">
+        <div class="btn-row">
+          <button class="btn btn-sm" id="docModeWord">Word (.docx)</button>
+          <button class="btn btn-sm" id="docModePdf">PDF</button>
+        </div>
+        <span class="muted" style="font-size:13px">表格自动绘制边框，图片按阈值二值化</span>
+      </div>
+      <div class="form-row full" id="pdfModeRow" style="display:none">
+        <label>PDF 打印模式</label>
+        <div class="btn-row">
+          <button class="btn btn-sm btn-primary" id="pdfModeText">文本模式（重排）</button>
+          <button class="btn btn-sm" id="pdfModePage">整页图片（保留排版）</button>
+        </div>
+      </div>
+      <div class="form-row full">
+        <label>选择文件 <span class="req">*</span></label>
+        <div class="file-drop" id="docDrop">
+          <div id="docDropText">点击选择或拖拽文件到此处</div>
+          <div class="fname" id="docName"></div>
+        </div>
+        <input type="file" id="docFile" accept=".docx,.pdf" style="display:none">
+      </div>
+      <div class="form-grid mt-12">
+        <div class="form-row">
+          <label for="d-fontSize">字号（像素）</label>
+          <input type="number" id="d-fontSize" value="24" min="8" max="80">
+        </div>
+        <div class="form-row">
+          <label for="d-lineSpacing">行间距（像素）</label>
+          <input type="number" id="d-lineSpacing" value="6" min="0" max="40">
+        </div>
+        <div class="form-row">
+          <label for="d-margin">左右边距（像素）</label>
+          <input type="number" id="d-margin" value="8" min="0" max="80">
+        </div>
+        <div class="form-row">
+          <label for="d-imageThreshold">图片阈值（0-255）</label>
+          <input type="number" id="d-imageThreshold" value="128" min="0" max="255">
+        </div>
+        <div class="form-row">
+          <label>样式</label>
+          <div class="check-row"><input type="checkbox" id="d-bold"><span>加粗</span></div>
+          <div class="check-row"><input type="checkbox" id="d-italic"><span>斜体</span></div>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-block mt-12" id="btnDoc">打印文档</button>
+    </div>
+  </div>
+
+  <!-- 表格 -->
+  <div class="tab-panel" id="panel-table">
+    <div class="card">
+      <div class="card-title">表格打印 <span class="hint">表头 1-8 列，数据 1-20 行，单元格用逗号分隔</span></div>
+      <div class="form-grid">
+        <div class="form-row full">
+          <label for="tb-headers">表头 <span class="req">*</span></label>
+          <input type="text" id="tb-headers" placeholder="科目,成绩">
+        </div>
+        <div class="form-row full">
+          <label for="tb-rows">数据行 <span class="req">*</span> <span class="muted" style="font-size:12px">每行一条记录，单元格用逗号分隔</span></label>
+          <textarea id="tb-rows" class="code" rows="6" placeholder="语文,92&#10;数学,88&#10;英语,95"></textarea>
+        </div>
+        <div class="form-row">
+          <label for="tb-fontSize">字号（像素）</label>
+          <input type="number" id="tb-fontSize" value="24" min="8" max="80">
+        </div>
+        <div class="form-row">
+          <label for="tb-colWeights">列宽权重（可选）</label>
+          <input type="text" id="tb-colWeights" placeholder="留空自动，如 20,30,50">
+        </div>
+        <div class="form-row">
+          <label for="tb-margin">左右边距（像素）</label>
+          <input type="number" id="tb-margin" value="8" min="0" max="80">
+        </div>
+      </div>
+      <div class="table-preview" id="tbPreview"></div>
+      <div class="live-preview" id="lp-table">
+        <div class="lp-label">实时预览<span class="lp-loading">渲染中…</span></div>
+        <div class="lp-img"><img alt="预览"></div>
+        <div class="lp-empty">填写表格后自动显示打印效果</div>
+        <div class="lp-error" id="lp-table-error"></div>
+      </div>
+      <button class="btn btn-primary btn-block mt-12" id="btnTable">打印表格</button>
+    </div>
+  </div>
+
+  <!-- 课程表 -->
+  <div class="tab-panel" id="panel-schedule">
+    <div class="card">
+      <div class="flex-between">
+        <div class="card-title" style="margin-bottom:0">课程表打印 <span class="hint">每天最多 12 节</span></div>
+        <div class="btn-row">
+          <button class="btn btn-sm" id="schedAdd">添加一节</button>
+          <button class="btn btn-sm" id="schedRemove">删除末节</button>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="schedule-grid" id="schedGrid"></div>
+      <div class="form-grid mt-12">
+        <div class="form-row">
+          <label for="s-fontSize">字号（像素）</label>
+          <input type="number" id="s-fontSize" value="24" min="8" max="80">
+        </div>
+        <div class="form-row">
+          <label for="s-margin">左右边距（像素）</label>
+          <input type="number" id="s-margin" value="8" min="0" max="80">
+        </div>
+      </div>
+      <div class="live-preview" id="lp-schedule">
+        <div class="lp-label">实时预览<span class="lp-loading">渲染中…</span></div>
+        <div class="lp-img"><img alt="预览"></div>
+        <div class="lp-empty">填写课程后自动显示打印效果</div>
+        <div class="lp-error" id="lp-schedule-error"></div>
+      </div>
+      <button class="btn btn-primary btn-block mt-12" id="btnSchedule">打印课程表</button>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script>
+'use strict';
+/* ===================== 配置 ===================== */
+const CONFIG_KEY = 'qrintprint_config_v1';
+const DAY_NAMES = ['周一','周二','周三','周四','周五','周六','周日'];
+
+const cfg = {
+  get base() { return (document.getElementById('baseUrl').value || '').trim().replace(/\/+$/, ''); },
+  get token() { return document.getElementById('token').value.trim(); }
+};
+
+function loadConfig() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(CONFIG_KEY) || '{}');
+    if (saved.baseUrl) document.getElementById('baseUrl').value = saved.baseUrl;
+    if (saved.token) document.getElementById('token').value = saved.token;
+  } catch (e) {}
+}
+function saveConfig() {
+  localStorage.setItem(CONFIG_KEY, JSON.stringify({ baseUrl: cfg.base, token: cfg.token }));
+}
+
+/* ===================== 工具 ===================== */
+function toast(msg, type = 'info') {
+  const wrap = document.getElementById('toastWrap');
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.textContent = msg;
+  wrap.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('show'));
+  setTimeout(() => {
+    el.classList.remove('show');
+    setTimeout(() => el.remove(), 300);
+  }, 2800);
+}
+
+async function apiFetch(path, method = 'GET', body = null) {
+  if (!cfg.base) throw new Error('请先填写服务地址');
+  const headers = {};
+  if (path !== '/api/health') {
+    if (!cfg.token) throw new Error('请先填写 API Token');
+    headers['X-Api-Token'] = cfg.token;
+  }
+  if (body) headers['Content-Type'] = 'application/json';
+  let resp;
+  try {
+    resp = await fetch(cfg.base + path, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined
+    });
+  } catch (e) {
+    throw new Error('无法连接到服务：请检查地址、网络与防火墙，若为浏览器跨域限制(CORS)需在服务端放行');
+  }
+  let data = null;
+  try { data = await resp.json(); } catch (e) {}
+  if (data && data.ok) return data;
+  const msg = (data && data.message) ? data.message : ('HTTP ' + resp.status);
+  throw new Error(msg);
+}
+
+function num(el, fallback) {
+  const v = parseFloat(el.value);
+  if (isNaN(v)) return fallback;
+  return v;
+}
+function numOrUndef(el) {
+  const v = parseFloat(el.value);
+  if (isNaN(v) || el.value === '') return undefined;
+  return v;
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    if (file.size > 10 * 1024 * 1024) return reject(new Error('文件超过 10MB 上限'));
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      const b64 = result.indexOf(',') >= 0 ? result.slice(result.indexOf(',') + 1) : result;
+      resolve(b64);
+    };
+    reader.onerror = () => reject(new Error('读取文件失败'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function setBtnLoading(btn, loading, text) {
+  if (loading) {
+    btn.dataset.text = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '处理中…';
+  } else {
+    btn.disabled = false;
+    btn.textContent = btn.dataset.text || text;
+  }
+}
+
+/* ===================== 实时预览 ===================== */
+function debounce(fn, ms) {
+  let timer = null;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), ms);
+  };
+}
+
+/**
+ * 请求服务端渲染预览图并显示。
+ * boxId: 预览容器 id; path: 预览接口路径; buildBody: () => body 或 null(表示内容为空,清空预览)
+ */
+async function updateLivePreview(boxId, path, buildBody) {
+  const box = document.getElementById(boxId);
+  if (!box) return;
+  const errEl = box.querySelector('.lp-error');
+  const imgEl = box.querySelector('.lp-img img');
+
+  const body = buildBody();
+  if (!body) {
+    box.classList.remove('show', 'loading', 'error');
+    box.classList.add('empty');
+    errEl.textContent = '';
+    return;
+  }
+  // 未配置连接时不请求,保持空态
+  if (!cfg.base || !cfg.token) {
+    box.classList.remove('show', 'loading', 'error');
+    box.classList.add('empty');
+    errEl.textContent = '';
+    return;
+  }
+
+  box.classList.remove('empty', 'error');
+  box.classList.add('show', 'loading');
+  errEl.textContent = '';
+  try {
+    const data = await apiFetch(path, 'POST', body);
+    imgEl.src = 'data:image/png;base64,' + data.imageBase64;
+    box.classList.remove('loading');
+  } catch (e) {
+    box.classList.remove('loading');
+    box.classList.add('error');
+    errEl.textContent = '预览失败：' + e.message;
+  }
+}
+
+/** 收集一组控件的值变化,返回防抖函数;控件变化时调用 refresh */
+function bindPreviewInputs(selectors, refresh) {
+  const els = selectors.map(s => document.querySelector(s)).filter(Boolean);
+  els.forEach(el => {
+    el.addEventListener('input', refresh);
+    el.addEventListener('change', refresh);
+  });
+}
+
+/* ===================== Tabs ===================== */
+document.getElementById('tabs').addEventListener('click', (e) => {
+  const btn = e.target.closest('.tab-btn');
+  if (!btn) return;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+});
+
+/* ===================== 连接状态 ===================== */
+function setConn(state, text) {
+  const pill = document.getElementById('connPill');
+  pill.classList.remove('online', 'offline');
+  if (state === 'online') pill.classList.add('online');
+  if (state === 'offline') pill.classList.add('offline');
+  document.getElementById('connText').textContent = text;
+}
+
+/* ===================== 测试连接 ===================== */
+document.getElementById('btnTest').addEventListener('click', async () => {
+  const btn = document.getElementById('btnTest');
+  setBtnLoading(btn, true);
+  const resultEl = document.getElementById('cfgResult');
+  resultEl.textContent = '正在测试…';
+  try {
+    const health = await apiFetch('/api/health');
+    let statusText = `已连接 ${health.app || ''} v${health.version || ''}`;
+    try {
+      const st = await apiFetch('/api/status');
+      if (st.connected) {
+        statusText += ` · ${st.deviceName || '打印机'}${st.batteryLabel ? ' · 电量 ' + st.batteryLabel : ''}`;
+      } else {
+        statusText += ' · 打印机未连接';
+      }
+    } catch (e) {
+      statusText += ' · 状态查询失败';
+    }
+    setConn('online', '在线');
+    resultEl.textContent = statusText;
+    toast('连接成功：' + statusText, 'success');
+  } catch (e) {
+    setConn('offline', '离线');
+    resultEl.textContent = e.message;
+    toast('连接失败：' + e.message, 'error');
+  } finally {
+    setBtnLoading(btn, false);
+  }
+});
+
+document.getElementById('btnSave').addEventListener('click', () => {
+  saveConfig();
+  toast('配置已保存到本地', 'success');
+});
+
+/* ===================== 状态查看 ===================== */
+async function refreshStatus(silent) {
+  const msg = document.getElementById('statusMsg');
+  if (!silent) msg.textContent = '正在查询…';
+  try {
+    const st = await apiFetch('/api/status');
+    const map = {
+      connected: st.connected ? '已连接' : '未连接',
+      mode: { bluetooth: '蓝牙', usb: 'USB', none: '无' }[st.mode] || st.mode || '—',
+      deviceName: st.deviceName || '—',
+      batteryLabel: st.batteryLabel || (st.batteryPercent != null ? st.batteryPercent + '%' : '—'),
+      paperState: st.paperState || '—',
+      hardwareState: st.hardwareState || '—',
+      thickness: st.thickness != null ? st.thickness : '—',
+      busy: st.busy ? '打印中' : '空闲'
+    };
+    Object.entries(map).forEach(([k, v]) => {
+      const el = document.querySelector(`#statusGrid [data-k="${k}"]`);
+      if (!el) return;
+      el.textContent = v;
+      el.classList.remove('good', 'bad', 'warn', 'muted');
+      if (k === 'connected') el.classList.add(v === '已连接' ? 'good' : 'bad');
+      else if (k === 'paperState') el.classList.add(v === '正常' ? 'good' : 'bad');
+      else if (k === 'hardwareState') el.classList.add(v === '正常' ? 'good' : 'bad');
+      else if (k === 'busy') el.classList.add(v === '空闲' ? 'muted' : 'warn');
+      else el.classList.add('muted');
+    });
+    msg.textContent = st.bluetoothStatusAvailable ? '' : '蓝牙状态通道不可用，电量/纸张等状态可能显示不完整';
+    setConn('online', '在线');
+  } catch (e) {
+    if (!silent) {
+      msg.textContent = e.message;
+      toast(e.message, 'error');
+      setConn('offline', '离线');
+    }
+  }
+}
+document.getElementById('btnRefreshStatus').addEventListener('click', () => refreshStatus(false));
+
+/* ===================== 文本打印 ===================== */
+document.getElementById('btnText').addEventListener('click', async () => {
+  const btn = document.getElementById('btnText');
+  const content = document.getElementById('t-content').value;
+  if (!content.trim()) return toast('请输入打印内容', 'error');
+  const body = {
+    content,
+    fontSize: num(document.getElementById('t-fontSize'), 24),
+    bold: document.getElementById('t-bold').checked,
+    italic: document.getElementById('t-italic').checked,
+    underline: document.getElementById('t-underline').checked,
+    letterSpacing: num(document.getElementById('t-letterSpacing'), 0),
+    lineSpacing: num(document.getElementById('t-lineSpacing'), 6),
+    margin: num(document.getElementById('t-margin'), 8),
+    formulaMode: document.getElementById('t-formula').checked
+  };
+  if (body.formulaMode) body.formulaScale = num(document.getElementById('t-formulaScale'), 100);
+  setBtnLoading(btn, true);
+  try {
+    await apiFetch('/api/print/text', 'POST', body);
+    toast('文本打印成功', 'success');
+  } catch (e) { toast(e.message, 'error'); }
+  finally { setBtnLoading(btn, false); }
+});
+
+/* 公式模式切换 */
+document.getElementById('t-formula').addEventListener('change', (e) => {
+  document.getElementById('t-formulaScaleRow').style.display = e.target.checked ? '' : 'none';
+});
+
+/* 文本实时预览 */
+const refreshTextPreview = debounce(() => {
+  const content = document.getElementById('t-content').value;
+  const body = {
+    content,
+    fontSize: num(document.getElementById('t-fontSize'), 24),
+    bold: document.getElementById('t-bold').checked,
+    italic: document.getElementById('t-italic').checked,
+    underline: document.getElementById('t-underline').checked,
+    letterSpacing: num(document.getElementById('t-letterSpacing'), 0),
+    lineSpacing: num(document.getElementById('t-lineSpacing'), 6),
+    margin: num(document.getElementById('t-margin'), 8),
+    formulaMode: document.getElementById('t-formula').checked
+  };
+  if (body.formulaMode) body.formulaScale = num(document.getElementById('t-formulaScale'), 100);
+  updateLivePreview('lp-text', '/api/preview/text', () => {
+    if (!content.trim()) return null;
+    return body;
+  });
+}, 300);
+bindPreviewInputs([
+  '#t-content', '#t-fontSize', '#t-lineSpacing', '#t-letterSpacing', '#t-margin',
+  '#t-bold', '#t-italic', '#t-underline', '#t-formula', '#t-formulaScale'
+], refreshTextPreview);
+
+/* ===================== 图片打印 ===================== */
+let selectedImage = null;
+const imgInput = document.getElementById('imgFile');
+const imgDrop = document.getElementById('imgDrop');
+
+imgDrop.addEventListener('click', () => imgInput.click());
+imgDrop.addEventListener('dragover', (e) => { e.preventDefault(); imgDrop.classList.add('drag'); });
+imgDrop.addEventListener('dragleave', () => imgDrop.classList.remove('drag'));
+imgDrop.addEventListener('drop', (e) => {
+  e.preventDefault(); imgDrop.classList.remove('drag');
+  if (e.dataTransfer.files.length) handleImageFile(e.dataTransfer.files[0]);
+});
+imgInput.addEventListener('change', () => { if (imgInput.files.length) handleImageFile(imgInput.files[0]); });
+
+function handleImageFile(file) {
+  if (!file.type.startsWith('image/')) return toast('请选择图片文件', 'error');
+  if (file.size > 10 * 1024 * 1024) return toast('图片超过 10MB 上限', 'error');
+  selectedImage = file;
+  document.getElementById('imgName').textContent = file.name;
+  const preview = document.getElementById('imgPreview');
+  const reader = new FileReader();
+  reader.onload = async () => {
+    const dataUrl = reader.result;
+    document.getElementById('imgPreviewImg').src = dataUrl;
+    document.getElementById('imgPreviewMeta').textContent =
+      `${file.name} · ${(file.size / 1024).toFixed(1)} KB`;
+    preview.classList.add('show');
+    // 记录 base64 并触发打印效果预览
+    selectedImageBase64 = dataUrl.indexOf(',') >= 0 ? dataUrl.slice(dataUrl.indexOf(',') + 1) : dataUrl;
+    refreshImagePreview();
+  };
+  reader.readAsDataURL(file);
+  toast('已选择图片：' + file.name, 'info');
+}
+
+/* 抖动算法切换：none 时显示阈值 */
+document.getElementById('i-dither').addEventListener('change', (e) => {
+  document.getElementById('i-thresholdRow').style.display = e.target.value === 'none' ? '' : 'none';
+});
+
+/* 图片实时预览：选中图片后自动显示二值化效果 */
+let selectedImageBase64 = null;
+const refreshImagePreview = debounce(() => {
+  if (!selectedImageBase64) {
+    updateLivePreview('lp-image', '/api/preview/image', () => null);
+    return;
+  }
+  const body = {
+    imageBase64: selectedImageBase64,
+    ditherMode: document.getElementById('i-dither').value
+  };
+  if (body.ditherMode === 'none') body.threshold = num(document.getElementById('i-threshold'), 128);
+  updateLivePreview('lp-image', '/api/preview/image', () => body);
+}, 300);
+bindPreviewInputs(['#i-dither', '#i-threshold'], refreshImagePreview);
+
+document.getElementById('btnImage').addEventListener('click', async () => {
+  const btn = document.getElementById('btnImage');
+  if (!selectedImage) return toast('请先选择图片', 'error');
+  setBtnLoading(btn, true);
+  try {
+    const imageBase64 = await fileToBase64(selectedImage);
+    const body = { imageBase64, ditherMode: document.getElementById('i-dither').value };
+    const thickness = numOrUndef(document.getElementById('i-thickness'));
+    if (thickness !== undefined) body.thickness = thickness;
+    if (body.ditherMode === 'none') body.threshold = num(document.getElementById('i-threshold'), 128);
+    await apiFetch('/api/print/image', 'POST', body);
+    toast('图片打印成功', 'success');
+  } catch (e) { toast(e.message, 'error'); }
+  finally { setBtnLoading(btn, false); }
+});
+
+/* ===================== Markdown 打印 ===================== */
+const refreshMarkdownPreview = debounce(() => {
+  const content = document.getElementById('m-content').value;
+  const body = {
+    content,
+    fontSize: num(document.getElementById('m-fontSize'), 24),
+    margin: num(document.getElementById('m-margin'), 8)
+  };
+  updateLivePreview('lp-markdown', '/api/preview/markdown', () => {
+    if (!content.trim()) return null;
+    return body;
+  });
+}, 300);
+bindPreviewInputs(['#m-content', '#m-fontSize', '#m-margin'], refreshMarkdownPreview);
+
+document.getElementById('btnMarkdown').addEventListener('click', async () => {
+  const btn = document.getElementById('btnMarkdown');
+  const content = document.getElementById('m-content').value;
+  if (!content.trim()) return toast('请输入 Markdown 内容', 'error');
+  const body = {
+    content,
+    fontSize: num(document.getElementById('m-fontSize'), 24),
+    margin: num(document.getElementById('m-margin'), 8)
+  };
+  setBtnLoading(btn, true);
+  try {
+    await apiFetch('/api/print/markdown', 'POST', body);
+    toast('Markdown 打印成功', 'success');
+  } catch (e) { toast(e.message, 'error'); }
+  finally { setBtnLoading(btn, false); }
+});
+
+/* ===================== 条码打印 ===================== */
+const TWO_D_TYPES = ['QR_CODE', 'DATA_MATRIX', 'PDF_417', 'AZTEC'];
+const codeTypeSel = document.getElementById('b-codeType');
+codeTypeSel.addEventListener('change', () => {
+  const is2d = TWO_D_TYPES.includes(codeTypeSel.value);
+  if (is2d && document.getElementById('b-height').value === '140') {
+    document.getElementById('b-height').value = '384';
+  }
+  if (!is2d && document.getElementById('b-height').value === '384' && !document.getElementById('b-height').dataset.manual) {
+    document.getElementById('b-height').value = '140';
+  }
+});
+
+const refreshBarcodePreview = debounce(() => {
+  const content = document.getElementById('b-content').value.trim();
+  const body = {
+    content,
+    codeType: codeTypeSel.value,
+    width: num(document.getElementById('b-width'), 384),
+    height: num(document.getElementById('b-height'), 384),
+    margin: num(document.getElementById('b-margin'), 1)
+  };
+  updateLivePreview('lp-barcode', '/api/preview/barcode', () => {
+    if (!content) return null;
+    return body;
+  });
+}, 300);
+bindPreviewInputs([
+  '#b-content', '#b-codeType', '#b-width', '#b-height', '#b-margin'
+], refreshBarcodePreview);
+
+document.getElementById('btnBarcode').addEventListener('click', async () => {
+  const btn = document.getElementById('btnBarcode');
+  const content = document.getElementById('b-content').value.trim();
+  if (!content) return toast('请输入条码内容', 'error');
+  const body = {
+    content,
+    codeType: codeTypeSel.value,
+    width: num(document.getElementById('b-width'), 384),
+    height: num(document.getElementById('b-height'), 384),
+    margin: num(document.getElementById('b-margin'), 1)
+  };
+  const thickness = numOrUndef(document.getElementById('b-thickness'));
+  if (thickness !== undefined) body.thickness = thickness;
+  setBtnLoading(btn, true);
+  try {
+    await apiFetch('/api/print/barcode', 'POST', body);
+    toast('条码打印成功', 'success');
+  } catch (e) { toast(e.message, 'error'); }
+  finally { setBtnLoading(btn, false); }
+});
+
+/* ===================== Word / PDF 打印 ===================== */
+let docMode = 'word';
+let pdfMode = 'text';
+let selectedDoc = null;
+const docFileInput = document.getElementById('docFile');
+const docDrop = document.getElementById('docDrop');
+
+function setDocMode(mode) {
+  docMode = mode;
+  document.getElementById('docModeWord').classList.toggle('btn-primary', mode === 'word');
+  document.getElementById('docModePdf').classList.toggle('btn-primary', mode === 'pdf');
+  document.getElementById('docTitle').textContent = mode === 'word' ? 'Word 文档打印' : 'PDF 文档打印';
+  document.getElementById('docFile').accept = mode === 'word' ? '.docx' : '.pdf';
+  document.getElementById('pdfModeRow').style.display = mode === 'pdf' ? 'flex' : 'none';
+  selectedDoc = null;
+  document.getElementById('docName').textContent = '';
+  document.getElementById('docDropText').textContent = mode === 'word' ? '点击选择或拖拽 .docx 文件到此处' : '点击选择或拖拽 .pdf 文件到此处';
+}
+function setPdfMode(mode) {
+  pdfMode = mode;
+  document.getElementById('pdfModeText').classList.toggle('btn-primary', mode === 'text');
+  document.getElementById('pdfModePage').classList.toggle('btn-primary', mode === 'page');
+}
+document.getElementById('docModeWord').addEventListener('click', () => setDocMode('word'));
+document.getElementById('docModePdf').addEventListener('click', () => setDocMode('pdf'));
+document.getElementById('pdfModeText').addEventListener('click', () => setPdfMode('text'));
+document.getElementById('pdfModePage').addEventListener('click', () => setPdfMode('page'));
+docDrop.addEventListener('click', () => docFileInput.click());
+docDrop.addEventListener('dragover', (e) => { e.preventDefault(); docDrop.classList.add('drag'); });
+docDrop.addEventListener('dragleave', () => docDrop.classList.remove('drag'));
+docDrop.addEventListener('drop', (e) => {
+  e.preventDefault(); docDrop.classList.remove('drag');
+  if (e.dataTransfer.files.length) handleDocFile(e.dataTransfer.files[0]);
+});
+docFileInput.addEventListener('change', () => { if (docFileInput.files.length) handleDocFile(docFileInput.files[0]); });
+
+function handleDocFile(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (docMode === 'word' && ext !== 'docx') return toast('请选择 .docx 文件', 'error');
+  if (docMode === 'pdf' && ext !== 'pdf') return toast('请选择 .pdf 文件', 'error');
+  if (file.size > 10 * 1024 * 1024) return toast('文件超过 10MB 上限', 'error');
+  selectedDoc = file;
+  document.getElementById('docName').textContent = `${file.name} · ${(file.size / 1024).toFixed(1)} KB`;
+  toast('已选择文件：' + file.name, 'info');
+}
+
+document.getElementById('btnDoc').addEventListener('click', async () => {
+  const btn = document.getElementById('btnDoc');
+  if (!selectedDoc) return toast('请先选择文件', 'error');
+  setBtnLoading(btn, true);
+  try {
+    const fileBase64 = await fileToBase64(selectedDoc);
+    const body = {
+      fileBase64,
+      fontSize: num(document.getElementById('d-fontSize'), 24),
+      bold: document.getElementById('d-bold').checked,
+      italic: document.getElementById('d-italic').checked,
+      lineSpacing: num(document.getElementById('d-lineSpacing'), 6),
+      margin: num(document.getElementById('d-margin'), 8),
+      imageThreshold: num(document.getElementById('d-imageThreshold'), 128)
+    };
+    if (docMode === 'pdf') body.mode = pdfMode;
+    await apiFetch('/api/print/' + (docMode === 'word' ? 'word' : 'pdf'), 'POST', body);
+    toast((docMode === 'word' ? 'Word' : 'PDF') + ' 打印成功', 'success');
+  } catch (e) { toast(e.message, 'error'); }
+  finally { setBtnLoading(btn, false); }
+});
+
+/* ===================== 表格打印 ===================== */
+function parseTable() {
+  const headers = document.getElementById('tb-headers').value
+    .split(/[,，\t]/).map(s => s.trim()).filter(Boolean);
+  const rows = document.getElementById('tb-rows').value
+    .split('\n').map(l => l.trim()).filter(Boolean)
+    .map(l => l.split(/[,，\t]/).map(s => s.trim()));
+  return { headers, rows };
+}
+
+/** 列宽权重:逗号分隔的正数数组,无有效值返回 undefined(服务端按内容自适应) */
+function parseColWeights() {
+  const v = document.getElementById('tb-colWeights').value.trim();
+  if (!v) return undefined;
+  const arr = v.split(/[,，\t]/).map(s => parseFloat(s.trim())).filter(n => !isNaN(n) && n > 0);
+  return arr.length ? arr : undefined;
+}
+
+function renderTablePreview() {
+  const { headers, rows } = parseTable();
+  const box = document.getElementById('tbPreview');
+  if (!headers.length && !rows.length) { box.innerHTML = ''; return; }
+  const colCount = Math.max(headers.length, ...(rows.map(r => r.length).concat([0])));
+  let html = '<table><thead><tr>';
+  for (let i = 0; i < Math.max(colCount, headers.length); i++) {
+    html += `<th>${escapeHtml(headers[i] || '')}</th>`;
+  }
+  html += '</tr></thead><tbody>';
+  if (!rows.length) {
+    html += `<tr><td colspan="${Math.max(colCount, headers.length)}" class="empty-note">暂无数据行</td></tr>`;
+  }
+  rows.forEach(r => {
+    html += '<tr>';
+    for (let i = 0; i < colCount; i++) html += `<td>${escapeHtml(r[i] || '')}</td>`;
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  box.innerHTML = html;
+}
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+document.getElementById('tb-headers').addEventListener('input', renderTablePreview);
+document.getElementById('tb-rows').addEventListener('input', renderTablePreview);
+
+/* 表格实时打印效果预览 */
+const refreshTablePreview = debounce(() => {
+  const { headers, rows } = parseTable();
+  const body = {
+    headers,
+    rows,
+    fontSize: num(document.getElementById('tb-fontSize'), 24),
+    margin: num(document.getElementById('tb-margin'), 8)
+  };
+  const cw = parseColWeights();
+  if (cw) body.colWeights = cw;
+  updateLivePreview('lp-table', '/api/preview/table', () => {
+    if (!headers.length || !rows.length) return null;
+    return body;
+  });
+}, 300);
+bindPreviewInputs(['#tb-headers', '#tb-rows', '#tb-fontSize', '#tb-colWeights', '#tb-margin'], refreshTablePreview);
+
+document.getElementById('btnTable').addEventListener('click', async () => {
+  const btn = document.getElementById('btnTable');
+  const { headers, rows } = parseTable();
+  if (!headers.length) return toast('请填写表头', 'error');
+  if (headers.length > 8) return toast('表头最多 8 列', 'error');
+  if (!rows.length) return toast('请填写至少一行数据', 'error');
+  if (rows.length > 20) return toast('数据最多 20 行', 'error');
+  const body = {
+    headers,
+    rows,
+    fontSize: num(document.getElementById('tb-fontSize'), 24),
+    margin: num(document.getElementById('tb-margin'), 8)
+  };
+  const cw = parseColWeights();
+  if (cw) body.colWeights = cw;
+  setBtnLoading(btn, true);
+  try {
+    await apiFetch('/api/print/table', 'POST', body);
+    toast('表格打印成功', 'success');
+  } catch (e) { toast(e.message, 'error'); }
+  finally { setBtnLoading(btn, false); }
+});
+
+/* ===================== 课程表打印 ===================== */
+const schedGrid = document.getElementById('schedGrid');
+const SCHED_MAX_ROWS = 12;
+let schedRows = 5;
+
+function renderSchedule() {
+  let html = '<div class="sched-head"><div></div>';
+  DAY_NAMES.forEach(d => html += `<div>${d}</div>`);
+  html += '</div>';
+  for (let i = 0; i < schedRows; i++) {
+    html += `<div class="sched-row"><div class="slot-label">第${i + 1}节</div>`;
+    for (let d = 0; d < 7; d++) {
+      html += `<input type="text" data-row="${i}" data-day="${d}" maxlength="30" placeholder="">`;
+    }
+    html += '</div>';
+  }
+  schedGrid.innerHTML = html;
+}
+function collectSchedule() {
+  const days = Array.from({ length: 7 }, () => []);
+  schedGrid.querySelectorAll('input').forEach(inp => {
+    days[Number(inp.dataset.day)][Number(inp.dataset.row)] = inp.value.trim();
+  });
+  // 去除每天末尾的空课程
+  return days.map(d => {
+    while (d.length && d[d.length - 1] === '') d.pop();
+    return d;
+  });
+}
+document.getElementById('schedAdd').addEventListener('click', () => {
+  if (schedRows >= SCHED_MAX_ROWS) return toast(`每天最多 ${SCHED_MAX_ROWS} 节`, 'error');
+  schedRows++;
+  renderSchedule();
+  refreshSchedulePreview();
+});
+document.getElementById('schedRemove').addEventListener('click', () => {
+  if (schedRows <= 1) return;
+  schedRows--;
+  renderSchedule();
+  refreshSchedulePreview();
+});
+
+/* 课程表实时打印效果预览（单元格动态重建,用事件委托） */
+const refreshSchedulePreview = debounce(() => {
+  const days = collectSchedule();
+  const body = {
+    days,
+    fontSize: num(document.getElementById('s-fontSize'), 24),
+    margin: num(document.getElementById('s-margin'), 8)
+  };
+  updateLivePreview('lp-schedule', '/api/preview/schedule', () => {
+    if (!days.some(d => d.length)) return null;
+    return body;
+  });
+}, 300);
+schedGrid.addEventListener('input', refreshSchedulePreview);
+bindPreviewInputs(['#s-fontSize', '#s-margin'], refreshSchedulePreview);
+
+document.getElementById('btnSchedule').addEventListener('click', async () => {
+  const btn = document.getElementById('btnSchedule');
+  const days = collectSchedule();
+  if (!days.some(d => d.length)) return toast('请至少填写一节课程', 'error');
+  const body = {
+    days,
+    fontSize: num(document.getElementById('s-fontSize'), 24),
+    margin: num(document.getElementById('s-margin'), 8)
+  };
+  setBtnLoading(btn, true);
+  try {
+    await apiFetch('/api/print/schedule', 'POST', body);
+    toast('课程表打印成功', 'success');
+  } catch (e) { toast(e.message, 'error'); }
+  finally { setBtnLoading(btn, false); }
+});
+
+/* ===================== 初始化 ===================== */
+loadConfig();
+renderSchedule();
+renderTablePreview();
+setDocMode('word');
+document.getElementById('t-formula').dispatchEvent(new Event('change'));
+document.getElementById('i-dither').dispatchEvent(new Event('change'));
+// 启动后自动查询一次状态
+if (cfg.base && cfg.token) refreshStatus(true);
+</script>
+</body>
+</html>

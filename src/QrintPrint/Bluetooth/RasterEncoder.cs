@@ -170,6 +170,29 @@ public static class RasterEncoder
         return PackBinaryToRaster(binary, gray.Width, gray.Height);
     }
 
+    /// <summary>
+    /// 生成一张测试图案(黑白交替的粗横条),用于验证打印机是否真的响应。
+    /// 不依赖字体渲染,任何打印机能打光栅即可打出明显的条纹,一眼就能确认有没有动。
+    /// </summary>
+    public static RasterData CreateTestPattern()
+    {
+        const int height = 200;
+        byte[] binary = new byte[QringProtocol.WIDTH_DOTS * height];
+        for (int y = 0; y < height; y++)
+        {
+            // 每 20 点行黑白交替
+            if ((y / 20) % 2 == 0)
+            {
+                int rowBase = y * QringProtocol.WIDTH_DOTS;
+                for (int x = 0; x < QringProtocol.WIDTH_DOTS; x++)
+                {
+                    binary[rowBase + x] = 1;
+                }
+            }
+        }
+        return PackBinaryToRaster(binary, QringProtocol.WIDTH_DOTS, height);
+    }
+
     // ── 二值 → 预览位图 ──────────────────────────────────────────
 
     /// <summary>

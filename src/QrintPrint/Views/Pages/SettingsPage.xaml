@@ -103,25 +103,107 @@
                                  LostFocus="ApiPortBox_LostFocus" />
                     </Grid>
 
+                    <TextBlock Style="{StaticResource SubtitleText}" Text="API Key 管理" Margin="0,16,0,4" />
                     <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="100" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Style="{StaticResource CaptionText}"
+                                   Text="新建 Key" VerticalAlignment="Center" />
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <TextBox x:Name="NewKeyNameBox" Width="180"
+                                     VerticalAlignment="Center" />
+                            <CheckBox x:Name="NewKeyAdminCheck" Content="管理员（全权限）"
+                                      VerticalAlignment="Center" Margin="8,0,0,0" />
+                        </StackPanel>
+                        <Button Grid.Column="2" Margin="8,0,0,0" Padding="10,4"
+                                Content="创建" Click="AddKeyBtn_Click" />
+                    </Grid>
+
+                    <TextBlock Margin="0,12,0,4" Style="{StaticResource CaptionText}"
+                               Text="已配置的 Key（选中可查看令牌与权限）" />
+                    <ListBox x:Name="ApiKeyList" Height="120" Margin="0,0,0,0"
+                             SelectionChanged="ApiKeyList_SelectionChanged"
+                             Background="{DynamicResource Layer02Brush}"
+                             BorderBrush="{DynamicResource ControlStrokeBrush}"
+                             BorderThickness="1">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Margin="2,4">
+                                    <TextBlock Style="{StaticResource BodyStrongText}">
+                                        <Run Text="{Binding Name, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding KindLabel, Mode=OneWay}" />
+                                    </TextBlock>
+                                    <TextBlock FontFamily="Consolas" FontSize="11"
+                                               Text="{Binding Token}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="100" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Style="{StaticResource CaptionText}"
+                                   Text="访问令牌" VerticalAlignment="Center" />
+                        <TextBox Grid.Column="1" x:Name="SelectedKeyTokenBox" IsReadOnly="True"
+                                 VerticalAlignment="Center"
+                                 FontFamily="{StaticResource ContentFontFamily}" />
+                        <Button Grid.Column="2" Margin="8,0,0,0" Padding="10,4"
+                                Content="复制" Click="CopyTokenBtn_Click" />
+                    </Grid>
+
+                    <TextBlock Margin="0,12,0,4" Style="{StaticResource CaptionText}"
+                               Text="接口权限（管理员 Key 自动拥有全部；普通 Key 仅可访问勾选的接口）" />
+                    <ItemsControl x:Name="PermissionPanel">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+
+                    <Button Margin="0,12,0,0" Padding="10,4" HorizontalAlignment="Left"
+                            Content="删除选中的 Key" Click="DeleteKeyBtn_Click" />
+
+                    <TextBlock Margin="0,12,0,0" Style="{StaticResource CaptionText}"
+                               TextWrapping="Wrap"
+                               Text="局域网内设备通过 HTTP API 远程打印（请求头携带 X-Api-Token）。不同 Key 可分配不同权限，例如只给他人开放文本打印。如需公网访问，请自行配置 frp 等内网穿透，务必做好鉴权。" />
+                </StackPanel>
+            </Border>
+
+            <!-- 虚拟打印机 -->
+            <TextBlock Style="{StaticResource SubtitleText}" Text="虚拟打印机" Margin="0,0,0,16" />
+            <Border Background="{DynamicResource Layer02Brush}"
+                    BorderBrush="{DynamicResource ControlStrokeBrush}"
+                    BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,0,0,24">
+                <StackPanel>
+                    <Grid Margin="0,4">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="100" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" Style="{StaticResource CaptionText}"
-                                   Text="访问令牌" VerticalAlignment="Center" />
-                        <StackPanel Grid.Column="1" Orientation="Horizontal">
-                            <TextBox x:Name="ApiTokenBox" Width="260" IsReadOnly="True"
-                                     VerticalAlignment="Center"
-                                     FontFamily="{StaticResource ContentFontFamily}" />
-                            <Button Margin="8,0,0,0" Padding="10,4"
-                                    Click="RegenerateTokenBtn_Click" Content="重新生成" />
-                        </StackPanel>
+                                   Text="数据通道" VerticalAlignment="Center" />
+                        <ComboBox x:Name="VpModeCombo" Grid.Column="1" Width="260"
+                                  HorizontalAlignment="Left"
+                                  SelectionChanged="VpModeCombo_SelectionChanged">
+                            <ComboBoxItem Tag="tcp" Content="TCP 端口接收（零依赖，推荐）" />
+                            <ComboBoxItem Tag="redmon" Content="RedMon 端口（可传二进制，需 DLL）" />
+                        </ComboBox>
                     </Grid>
-
-                    <TextBlock Margin="0,12,0,0" Style="{StaticResource CaptionText}"
-                               TextWrapping="Wrap"
-                               Text="局域网内设备通过 HTTP API 远程打印（需携带访问令牌）。如需公网访问，请自行配置 frp 等内网穿透，务必做好鉴权。" />
+                    <CheckBox x:Name="VpEnableCheck" Content="启用虚拟打印机（其他软件可直接打印到本打印机）"
+                              Margin="0,8,0,0" Checked="VpEnableCheck_Changed" Unchecked="VpEnableCheck_Changed" />
+                    <TextBlock x:Name="VpStatusText" Margin="0,4,0,0"
+                               Style="{StaticResource CaptionText}" Text="未启用" TextWrapping="Wrap" />
+                    <TextBlock Margin="0,8,0,0" Style="{StaticResource CaptionText}" TextWrapping="Wrap"
+                               Text="启用后系统会创建一个“QrintPrint 虚拟打印机”队列，Word / 浏览器 / 订单系统等任何软件都能直接打印到热敏打印机。首次启用会安装 RedMon 端口监视器并创建队列，需要管理员权限（会弹出 UAC 授权窗口）。" />
                 </StackPanel>
             </Border>
 
@@ -158,11 +240,13 @@
                 <StackPanel>
                     <TextBlock Style="{StaticResource BodyStrongText}" Text="QrintPrint" />
                     <TextBlock Margin="0,4,0,0" Style="{StaticResource CaptionText}"
-                               Text="错题小印 Windows 版 v1.0.3" />
+                               Text="错题小印 Windows 版 v1.1.0" />
                     <TextBlock Margin="0,8,0,0" Style="{StaticResource CaptionText}"
                                Text="基于 Qring 私有协议，支持文本、照片、条码、自定义画布打印" />
                     <TextBlock Margin="0,12,0,0" Style="{StaticResource CaptionText}"
                                Text="ZhaYi &amp; DeepSeek" />
+                    <TextBlock Margin="0,8,0,0" Style="{StaticResource CaptionText}"
+                               Text="打印机交流群号：419668261" />
                 </StackPanel>
             </Border>
         </StackPanel>

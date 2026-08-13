@@ -1,3 +1,4 @@
+using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
@@ -7,6 +8,7 @@ using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
 using DocumentFormat.OpenXml.Drawing.Wordprocessing;
 using QrintPrint.Bluetooth;
+using QrintPrint.HttpApi;
 using QrintPrint.Models;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
@@ -21,8 +23,19 @@ public partial class WordPrintPage : UserControl, IPage
     private List<ParagraphSegment> _segments = new();
     private const double DISPLAY_SCALE = 0.5;
 
-    /// <summary>解析后的段落段:文本段、公式段、图片段或表格段</summary>
-    private sealed record ParagraphSegment(string Text, bool IsFormula, bool IsImage, bool IsTable);
+    /// <summary>
+    /// 解析后的段落段:文本段、公式段、图片段或表格段。
+    /// 图片段携带原始字节(ImageBytes),表格段携带结构化行列数据(TableHeaders/TableRows),
+    /// 打印时分别走图片二值化管线与真边框网格渲染,不再退化为文字占位。
+    /// </summary>
+    internal sealed record ParagraphSegment(
+        string Text,
+        bool IsFormula,
+        bool IsImage,
+        bool IsTable,
+        byte[]? ImageBytes = null,
+        List<string>? TableHeaders = null,
+        List<List<string>>? TableRows = null);
 
     public WordPrintPage()
     {
@@ -52,25 +65,31 @@ public partial class WordPrintPage : UserControl, IPage
 
     // ── 解析与渲染 ────────────────────────────────────────────
 
-    private void ParseAndRender()
+    private async void ParseAndRender()
     {
         if (_docxPath is null) return;
 
+        // 长文档解析/渲染耗时,放入后台线程执行,避免 UI 卡死
+        int version = ++_renderVersion;
         try
         {
             DocInfo.Visibility = Visibility.Visible;
             FileNameText.Text = System.IO.Path.GetFileName(_docxPath);
 
-            _segments = ParseDocx(_docxPath);
+            var segments = await Task.Run(() => ParseDocx(System.IO.File.ReadAllBytes(_docxPath!)));
+            if (version != _renderVersion) return; // 期间已重新解析,丢弃过期结果
+
+            _segments = segments;
             int formulaCount = _segments.Count(s => s.IsFormula);
             int imageCount = _segments.Count(s => s.IsImage);
             int tableCount = _segments.Count(s => s.IsTable);
             PageCountText.Text = $"共 {_segments.Count} 个段落段 · {formulaCount} 个公式 · {imageCount} 个图片 · {tableCount} 个表格";
 
-            UpdatePreview();
+            await UpdatePreviewAsync();
         }
         catch (Exception ex)
         {
+            if (version != _renderVersion) return;
             MessageBox.Show($"文档解析失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
@@ -79,11 +98,12 @@ public partial class WordPrintPage : UserControl, IPage
     /// 解析 .docx 文件,提取段落文本、图片、表格,并识别 $...$ 内的 LaTeX 公式。
     /// 单个元素解析失败不会导致整体崩溃。
     /// </summary>
-    private static List<ParagraphSegment> ParseDocx(string path)
+    internal static List<ParagraphSegment> ParseDocx(byte[] docxData)
     {
         var segments = new List<ParagraphSegment>();
 
-        using var doc = WordprocessingDocument.Open(path, false);
+        using var ms = new MemoryStream(docxData);
+        using var doc = WordprocessingDocument.Open(ms, false);
         var body = doc.MainDocumentPart?.Document?.Body;
         if (body is null) return segments;
 
@@ -93,7 +113,7 @@ public partial class WordPrintPage : UserControl, IPage
             {
                 if (element is Paragraph para)
                 {
-                    ParseParagraph(para, segments);
+                    ParseParagraph(doc, para, segments);
                 }
                 else if (element is Table table)
                 {
@@ -111,7 +131,7 @@ public partial class WordPrintPage : UserControl, IPage
     }
 
     /// <summary>解析段落:提取文本和图片,识别公式</summary>
-    private static void ParseParagraph(Paragraph para, List<ParagraphSegment> segments)
+    private static void ParseParagraph(WordprocessingDocument doc, Paragraph para, List<ParagraphSegment> segments)
     {
         // 检查段落中是否有图片(Drawing 元素)
         var drawings = para.Descendants<Drawing>().ToList();
@@ -122,10 +142,8 @@ public partial class WordPrintPage : UserControl, IPage
             {
                 SplitAndAddSegments(textBefore, segments);
             }
-            foreach (var _ in drawings)
-            {
-                segments.Add(new ParagraphSegment("[图片]", false, true, false));
-            }
+            byte[]? imageBytes = ExtractImageBytes(doc, para);
+            segments.Add(new ParagraphSegment("[图片]", false, true, false, imageBytes));
             return;
         }
 
@@ -133,6 +151,26 @@ public partial class WordPrintPage : UserControl, IPage
         if (string.IsNullOrWhiteSpace(text)) return;
 
         SplitAndAddSegments(text, segments);
+    }
+
+    /// <summary>从段落中提取图片的原始字节(Drawing → Blip.Embed → ImagePart)</summary>
+    private static byte[]? ExtractImageBytes(WordprocessingDocument doc, Paragraph para)
+    {
+        try
+        {
+            var blip = para.Descendants<DocumentFormat.OpenXml.Drawing.Blip>().FirstOrDefault();
+            if (blip?.Embed is null) return null;
+            var part = doc.MainDocumentPart?.GetPartById(blip.Embed);
+            if (part is null) return null;
+            using var ms = new MemoryStream();
+            part.GetStream().CopyTo(ms);
+            return ms.ToArray();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"提取图片字节失败: {ex.Message}");
+            return null;
+        }
     }
 
     /// <summary>按 $...$ 分割文本,识别公式段</summary>
@@ -158,7 +196,10 @@ public partial class WordPrintPage : UserControl, IPage
         }
     }
 
-    /// <summary>解析表格:逐行逐格提取文本,渲染为 ASCII 文本网格</summary>
+    /// <summary>
+    /// 解析表格:逐行逐格提取文本,输出结构化行列数据(首行为表头)。
+    /// 打印/预览时用 RenderTableGrid 画真实边框网格,避免 ASCII 网格换行错位。
+    /// </summary>
     private static void ParseTable(Table table, List<ParagraphSegment> segments)
     {
         var rows = table.Elements<TableRow>().ToList();
@@ -167,61 +208,26 @@ public partial class WordPrintPage : UserControl, IPage
         int maxCols = 0;
         foreach (var row in rows)
         {
-            int cellCount = row.Elements<TableCell>().Count();
-            if (cellCount > maxCols) maxCols = cellCount;
+            maxCols = Math.Max(maxCols, row.Elements<TableCell>().Count());
         }
+        if (maxCols == 0) return;
 
-        string[][] cells = new string[rows.Count][];
-        for (int r = 0; r < rows.Count; r++)
+        var cells = new List<List<string>>(rows.Count);
+        foreach (var row in rows)
         {
-            cells[r] = new string[maxCols];
-            var rowCells = rows[r].Elements<TableCell>().ToList();
+            var rowCells = row.Elements<TableCell>().ToList();
+            var line = new List<string>(maxCols);
             for (int c = 0; c < maxCols; c++)
             {
-                cells[r][c] = c < rowCells.Count ? rowCells[c].InnerText.Trim() : "";
+                line.Add(c < rowCells.Count ? rowCells[c].InnerText.Trim() : "");
             }
+            cells.Add(line);
         }
 
-        int[] colWidths = new int[maxCols];
-        for (int c = 0; c < maxCols; c++)
-        {
-            for (int r = 0; r < rows.Count; r++)
-            {
-                if (cells[r][c].Length > colWidths[c]) colWidths[c] = cells[r][c].Length;
-            }
-            if (colWidths[c] < 2) colWidths[c] = 2;
-        }
-
-        var sb = new StringBuilder();
-        sb.Append('+');
-        for (int c = 0; c < maxCols; c++)
-        {
-            sb.Append('-', colWidths[c] + 2);
-            sb.Append('+');
-        }
-        sb.AppendLine();
-
-        for (int r = 0; r < rows.Count; r++)
-        {
-            sb.Append('|');
-            for (int c = 0; c < maxCols; c++)
-            {
-                sb.Append(' ');
-                sb.Append(cells[r][c].PadRight(colWidths[c]));
-                sb.Append(" |");
-            }
-            sb.AppendLine();
-
-            sb.Append('+');
-            for (int c = 0; c < maxCols; c++)
-            {
-                sb.Append('-', colWidths[c] + 2);
-                sb.Append('+');
-            }
-            sb.AppendLine();
-        }
-
-        segments.Add(new ParagraphSegment(sb.ToString(), false, false, true));
+        // 第一行作为表头,其余为数据行;只有一行时允许"只有表头"的单行表格
+        var headers = cells[0];
+        var dataRows = cells.Skip(1).ToList();
+        segments.Add(new ParagraphSegment("", false, false, true, null, headers, dataRows));
     }
 
     /// <summary>提取段落中的所有文本</summary>
@@ -241,26 +247,33 @@ public partial class WordPrintPage : UserControl, IPage
     {
         if (FontSizeLabel is null) return;
         FontSizeLabel.Text = ((int)FontSizeSlider.Value).ToString();
-        UpdatePreview();
+        _ = UpdatePreviewAsync();
     }
 
-    private void StyleCheck_Changed(object sender, RoutedEventArgs e) => UpdatePreview();
+    private void StyleCheck_Changed(object sender, RoutedEventArgs e) => _ = UpdatePreviewAsync();
 
     private void LineSpacingSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         if (LineSpacingLabel is null) return;
         LineSpacingLabel.Text = ((int)LineSpacingSlider.Value).ToString();
-        UpdatePreview();
+        _ = UpdatePreviewAsync();
     }
 
     private void MarginSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         if (MarginLabel is null) return;
         MarginLabel.Text = ((int)MarginSlider.Value).ToString();
-        UpdatePreview();
+        _ = UpdatePreviewAsync();
     }
 
-    private void UpdatePreview()
+    private void ImageThresholdSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (ImageThresholdLabel is null) return;
+        ImageThresholdLabel.Text = ((int)ImageThresholdSlider.Value).ToString();
+        _ = UpdatePreviewAsync();
+    }
+
+    private async Task UpdatePreviewAsync()
     {
         if (_segments.Count == 0)
         {
@@ -268,65 +281,86 @@ public partial class WordPrintPage : UserControl, IPage
             return;
         }
 
+        // 先在 UI 线程读取控件参数
+        int margin = (int)MarginSlider.Value;
+        int maxWidth = QringProtocol.WIDTH_DOTS - 2 * margin;
+        int imageThreshold = (int)ImageThresholdSlider.Value;
+        var textOptions = new RasterEncoder.TextRenderOptions
+        {
+            FontSize = (int)FontSizeSlider.Value,
+            Bold = BoldCheck.IsChecked == true,
+            Italic = ItalicCheck.IsChecked == true,
+            Underline = false,
+            LetterSpacing = 0,
+            LineSpacing = (int)LineSpacingSlider.Value,
+            Margin = 0,
+        };
+
+        int version = ++_renderVersion;
         try
         {
-            int margin = (int)MarginSlider.Value;
-            int maxWidth = QringProtocol.WIDTH_DOTS - 2 * margin;
-
-            var textOptions = new RasterEncoder.TextRenderOptions
+            // 渲染耗时较长(长文档可达数千段),放入后台线程执行,避免 UI 卡死
+            var (canvas, canvasW, canvasH) = await Task.Run(() =>
             {
-                FontSize = (int)FontSizeSlider.Value,
-                Bold = BoldCheck.IsChecked == true,
-                Italic = ItalicCheck.IsChecked == true,
-                Underline = false,
-                LetterSpacing = 0,
-                LineSpacing = (int)LineSpacingSlider.Value,
-                Margin = 0,
-            };
+                var renderedSegments = new List<(byte[] Binary, int W, int H, bool FullWidth)>();
+                int totalHeight = 0;
 
-            var renderedSegments = new List<(byte[] Binary, int W, int H)>();
-            int totalHeight = 0;
-
-            foreach (var seg in _segments)
-            {
-                if (seg.IsFormula)
+                foreach (var seg in _segments)
                 {
-                    var gray = FormulaRenderer.RenderLaTeX(seg.Text, maxWidth);
-                    var binary = Dither.DitherToBinary(gray, DitherMode.NONE, RasterEncoder.THRESHOLD_FORMULA);
-                    renderedSegments.Add((binary, gray.Width, gray.Height));
-                    totalHeight += gray.Height + textOptions.LineSpacing;
+                    if (seg.IsFormula)
+                    {
+                        var gray = FormulaRenderer.RenderLaTeX(seg.Text, maxWidth);
+                        var binary = Dither.DitherToBinary(gray, DitherMode.NONE, RasterEncoder.THRESHOLD_FORMULA);
+                        renderedSegments.Add((binary, gray.Width, gray.Height, false));
+                        totalHeight += gray.Height + textOptions.LineSpacing;
+                    }
+                    else if (seg.IsTable && seg.TableHeaders is { Count: > 0 })
+                    {
+                        // 真边框网格:表格画布已含上下边距,整宽合成
+                        var (tb, tw, th) = PrintApiServer.RenderTableGrid(
+                            seg.TableHeaders, seg.TableRows ?? new(), (int)textOptions.FontSize, margin);
+                        if (tb.Length == 0) continue;
+                        renderedSegments.Add((tb, tw, th, true));
+                        totalHeight += th + textOptions.LineSpacing;
+                    }
+                    else if (seg.IsImage && seg.ImageBytes is { Length: > 0 })
+                    {
+                        // 内嵌图片:走图片二值化管线,阈值可调
+                        var (ib, iw, ih) = DocRenderHelper.RenderEmbeddedImage(seg.ImageBytes, maxWidth, imageThreshold);
+                        if (ib.Length == 0) continue;
+                        renderedSegments.Add((ib, iw, ih, false));
+                        totalHeight += ih + textOptions.LineSpacing;
+                    }
+                    else
+                    {
+                        // 图片无字节时同样渲染 "[图片]" 文字提示
+                        string display = seg.IsImage && string.IsNullOrWhiteSpace(seg.Text) ? "[图片]" : seg.Text;
+                        using var img = RasterEncoder.RenderTextToImageIn(display, textOptions, maxWidth);
+                        var gray = RasterEncoder.ImageToGrayRaw(img);
+                        var binary = Dither.DitherToBinary(gray, DitherMode.NONE, RasterEncoder.THRESHOLD_TEXT);
+                        renderedSegments.Add((binary, gray.Width, gray.Height, false));
+                        totalHeight += img.Height + textOptions.LineSpacing;
+                    }
                 }
-                else if (seg.IsImage)
+
+                if (totalHeight <= 0) return (Array.Empty<byte>(), 0, 0);
+
+                int cw = QringProtocol.WIDTH_DOTS;
+                int ch = totalHeight;
+                var canvas2 = Compositor.CreateBinaryCanvas(cw, ch);
+
+                int y = 0;
+                foreach (var (binary, w, h, fullWidth) in renderedSegments)
                 {
-                    // 图片占位:渲染 "[图片]" 文字提示
-                    var img = RasterEncoder.RenderTextToImageIn(seg.Text, textOptions, maxWidth);
-                    var gray = RasterEncoder.ImageToGrayRaw(img);
-                    var binary = Dither.DitherToBinary(gray, DitherMode.NONE, RasterEncoder.THRESHOLD_TEXT);
-                    renderedSegments.Add((binary, gray.Width, gray.Height));
-                    totalHeight += img.Height + textOptions.LineSpacing;
+                    Compositor.BlitBinary(canvas2, cw, ch, binary, w, h, fullWidth ? 0 : margin, y);
+                    y += h + textOptions.LineSpacing;
                 }
-                else
-                {
-                    var img = RasterEncoder.RenderTextToImageIn(seg.Text, textOptions, maxWidth);
-                    var gray = RasterEncoder.ImageToGrayRaw(img);
-                    var binary = Dither.DitherToBinary(gray, DitherMode.NONE, RasterEncoder.THRESHOLD_TEXT);
-                    renderedSegments.Add((binary, gray.Width, gray.Height));
-                    totalHeight += img.Height + textOptions.LineSpacing;
-                }
-            }
 
-            if (totalHeight <= 0) return;
+                return (canvas2, cw, ch);
+            });
 
-            int canvasW = QringProtocol.WIDTH_DOTS;
-            int canvasH = totalHeight;
-            var canvas = Compositor.CreateBinaryCanvas(canvasW, canvasH);
-
-            int y = 0;
-            foreach (var (binary, w, h) in renderedSegments)
-            {
-                Compositor.BlitBinary(canvas, canvasW, canvasH, binary, w, h, margin, y);
-                y += h + textOptions.LineSpacing;
-            }
+            if (version != _renderVersion) return; // 参数已变化,丢弃过期结果
+            if (canvas.Length == 0) return;
 
             var bmp = RasterEncoder.BinaryToPreviewBitmap(canvas, canvasW, canvasH, transparentWhite: true);
             PreviewImage.Source = bmp;
@@ -343,6 +377,7 @@ public partial class WordPrintPage : UserControl, IPage
 
     // ── 打印缓存 ──────────────────────────────────────────────
 
+    private int _renderVersion; // 渲染版本号:丢弃过期预览结果
     private byte[]? _printCanvas;
     private int _printCanvasW, _printCanvasH;
 
@@ -375,7 +410,8 @@ public partial class WordPrintPage : UserControl, IPage
 
         try
         {
-            var raster = RasterEncoder.PackBinaryToRaster(_printCanvas, _printCanvasW, _printCanvasH);
+            // 长文档画布很大,打包到后台线程执行,避免阻塞 UI
+            var raster = await Task.Run(() => RasterEncoder.PackBinaryToRaster(_printCanvas!, _printCanvasW, _printCanvasH));
             var result = await conn.PrintRasterAsync(raster, thickness: null);
 
             if (!result.Ok)

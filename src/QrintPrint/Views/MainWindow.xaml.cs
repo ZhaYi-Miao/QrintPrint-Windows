@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using QrintPrint.Bluetooth;
 using QrintPrint.HttpApi;
 using QrintPrint.Models;
+using QrintPrint.VirtualPrinter;
 using QrintPrint.Views.Pages;
 
 namespace QrintPrint.Views;
@@ -34,7 +35,12 @@ public partial class MainWindow : Window
         });
         // 按上次设置启动远程打印服务
         ApiPrefs.Load();
+        VirtualPrinterPrefs.Load();
         StartApiServer();
+
+        // 虚拟打印机曾启用（TCP 模式）→ 恢复接收服务，保持其他软件可继续打印
+        if (VirtualPrinterPrefs.Enabled && VirtualPrinterManager.IsTcpMode)
+            VirtualPrinterReceiver.StartListener();
     }
 
     private void NavList_SelectionChanged(object sender, SelectionChangedEventArgs e)

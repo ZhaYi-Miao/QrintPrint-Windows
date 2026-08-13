@@ -128,7 +128,7 @@
             <StackPanel>
                 <TextBlock Style="{StaticResource SubtitleText}" Text="文档打印" />
                 <TextBlock Margin="0,4,0,12" Style="{StaticResource CaptionText}"
-                           Text="支持 Word、表格、课程表、Markdown 等多种格式" />
+                           Text="支持 Word、PDF、表格、课程表、Markdown 等多种格式" />
                 <WrapPanel>
                     <Button Style="{StaticResource QuickActionButton}" Padding="24,12" Margin="0,0,8,8"
                             Click="QuickAction_Click" Tag="word" MinHeight="48">
@@ -138,6 +138,16 @@
                             <TextBlock Margin="8,0,0,0" Style="{StaticResource CaptionText}"
                                        VerticalAlignment="Center"
                                        Text=".docx" />
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource QuickActionButton}" Padding="24,12" Margin="0,0,8,8"
+                            Click="QuickAction_Click" Tag="pdf" MinHeight="48">
+                        <StackPanel Orientation="Horizontal" IsHitTestVisible="False">
+                            <TextBlock Style="{StaticResource BodyStrongText}"
+                                       Text="PDF 文档" />
+                            <TextBlock Margin="8,0,0,0" Style="{StaticResource CaptionText}"
+                                       VerticalAlignment="Center"
+                                       Text=".pdf" />
                         </StackPanel>
                     </Button>
                     <Button Style="{StaticResource QuickActionButton}" Padding="24,12" Margin="0,0,8,8"
@@ -171,12 +181,20 @@
                         </StackPanel>
                     </Button>
                 </WrapPanel>
+                <Border BorderBrush="{DynamicResource DividerStrokeBrush}"
+                        BorderThickness="0,1,0,0" Margin="0,8,0,12" />
+                <Button Style="{StaticResource QuickActionButton}" Padding="24,12"
+                        Click="QuickAction_Click" Tag="vprint" MinHeight="48"
+                        HorizontalAlignment="Left">
+                    <StackPanel Orientation="Horizontal" IsHitTestVisible="False">
+                        <TextBlock Style="{StaticResource BodyStrongText}"
+                                   Text="虚拟打印" />
+                        <TextBlock Margin="8,0,0,0" Style="{StaticResource CaptionText}"
+                                   VerticalAlignment="Center"
+                                   Text="任意软件 Ctrl+P 直接打印" />
+                    </StackPanel>
+                </Button>
             </StackPanel>
         </Border>
-
-        <!-- 底部说明 -->
-        <TextBlock Grid.Row="2" Style="{StaticResource CaptionText}"
-                   Text="点击快捷操作 → 进入对应打印页(左侧设置面板 + 右侧实时预览)"
-                   VerticalAlignment="Top" />
     </Grid>
 </UserControl>

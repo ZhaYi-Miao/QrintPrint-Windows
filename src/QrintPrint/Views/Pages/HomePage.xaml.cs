@@ -48,7 +48,10 @@ public partial class HomePage : UserControl, IPage
     private async void ConnBtn_Click(object sender, RoutedEventArgs e)
     {
         var conn = PrinterConnection.Instance;
-        if (conn.IsAlive())
+        // 用连接状态而不是 IsAlive() 判断：
+        // 蓝牙断开/拔线后 IsAlive() 可能已为 false，但界面仍显示“已连接”，
+        // 此时点“断开”应直接断开，而不是弹设备选择框。
+        if (conn.Status.ConnState == ConnState.CONNECTED)
         {
             conn.Disconnect();
             RefreshStatusCard();
@@ -59,33 +62,44 @@ public partial class HomePage : UserControl, IPage
         {
             Owner = Window.GetWindow(this),
         };
-        if (dlg.ShowDialog() == true)
+        bool? result = dlg.ShowDialog();
+        // 无论用户是选了设备还是点了取消，都重新刷新状态卡，
+        // 避免取消后界面残留旧的“已连接”显示
+        RefreshStatusCard();
+        if (result != true) return;
+
+        // USB 设备连接（winspool 单向打印 + 自动蓝牙查状态）
+        if (dlg.SelectedUsbDevice is { } usbDev)
         {
-            // USB 设备连接（winspool 单向打印 + 自动蓝牙查状态）
-            if (dlg.SelectedUsbDevice is { } usbDev)
+            await conn.ConnectUsbAsync(usbDev);
+            RefreshStatusCard();
+            return;
+        }
+
+        // 手动选择的打印机队列
+        if (dlg.SelectedPrinterQueue is { } queue)
+        {
+            await conn.ConnectQueueAsync(queue);
+            RefreshStatusCard();
+            return;
+        }
+
+        // 蓝牙设备连接
+        if (dlg.SelectedDevice is { } dev)
+        {
+            // Windows 11 首次连接时，系统会弹出配对请求，给用户提示
+            try
             {
-                await conn.ConnectUsbAsync(usbDev);
-                RefreshStatusCard();
+                BluetoothPairingHelper.ShowPairingGuide();
+            }
+            catch (OperationCanceledException)
+            {
+                // 用户取消了连接
                 return;
             }
 
-            // 蓝牙设备连接
-            if (dlg.SelectedDevice is { } dev)
-            {
-                // Windows 11 首次连接时，系统会弹出配对请求，给用户提示
-                try
-                {
-                    BluetoothPairingHelper.ShowPairingGuide();
-                }
-                catch (OperationCanceledException)
-                {
-                    // 用户取消了连接
-                    return;
-                }
-
-                await conn.ConnectAsync(dev.DeviceId, dev.Name);
-                RefreshStatusCard();
-            }
+            await conn.ConnectAsync(dev.DeviceId, dev.Name);
+            RefreshStatusCard();
         }
     }
 
@@ -105,9 +119,11 @@ public partial class HomePage : UserControl, IPage
                     "code" => new BarcodePrintPage(),
                     "custom" => new CustomPrintPage(),
                     "word" => new WordPrintPage(),
+                    "pdf" => new PdfPrintPage(),
                     "table" => new TablePrintPage(),
                     "schedule" => new SchedulePrintPage(),
                     "markdown" => new MarkdownPrintPage(),
+                    "vprint" => new VirtualPrinterSettingsPage(),
                     _ => null,
                 };
                 if (page is not null) mainWindow.NavigateTo(page);

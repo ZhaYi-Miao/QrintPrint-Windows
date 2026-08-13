@@ -9,7 +9,7 @@
     <LangVersion>latest</LangVersion>
     <RootNamespace>QrintPrint</RootNamespace>
     <AssemblyName>QrintPrint</AssemblyName>
-    <Version>1.0.3</Version>
+    <Version>1.1.0</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>icon.ico</ApplicationIcon>
   </PropertyGroup>
@@ -31,6 +31,7 @@
   <ItemGroup>
     <PackageReference Include="DocumentFormat.OpenXml" Version="3.2.0" />
     <PackageReference Include="InTheHand.Net.Bluetooth" Version="4.1.44" />
+    <PackageReference Include="PDFtoImage" Version="5.3.0" />
     <PackageReference Include="WpfMath" Version="2.1.0" />
     <!-- 条码生成：一维码 + 二维码全覆盖 -->
     <PackageReference Include="ZXing.Net" Version="0.16.9" />
@@ -41,6 +42,8 @@
     <PackageReference Include="System.Text.Json" Version="8.0.5" />
     <!-- USB 设备检测：WMI 查询打印机设备 -->
     <PackageReference Include="System.Management" Version="8.0.0" />
+    <!-- PDF 解析：纯托管实现(MIT)，无原生依赖，兼容单文件发布 -->
+    <PackageReference Include="UglyToad.PdfPig" Version="1.7.0-custom-5" />
   </ItemGroup>
 
 </Project>

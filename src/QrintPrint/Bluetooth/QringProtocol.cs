@@ -185,4 +185,32 @@ public static class QringProtocol
         }
         return sb.ToString().Trim();
     }
+
+    /// <summary>
+    /// 构建一次完整的打印任务字节流(握手 → 浓度 → 唤醒 → 走纸 → 光栅 → 走纸 → 停止)。
+    /// 蓝牙/USB/测试打印共用同一份序列,保证各通道行为一致。
+    /// </summary>
+    public static byte[] BuildRasterPrintJob(RasterData raster, byte thickness, int feedBefore, int feedAfter)
+    {
+        var commands = new List<byte[]>();
+        commands.Add(CMD_ENABLE);
+        commands.Add(CMD_ENABLE2);
+        commands.Add(CmdThickness(thickness));
+        commands.Add(CMD_WAKEUP);
+        commands.AddRange(CmdFeed(feedBefore));
+        commands.Add(CmdRasterHeader(raster.WidthBytes, raster.Height, 0));
+        commands.Add(raster.Data);
+        commands.AddRange(CmdFeed(feedAfter));
+        commands.Add(CMD_STOP);
+
+        int total = commands.Sum(c => c.Length);
+        byte[] job = new byte[total];
+        int offset = 0;
+        foreach (var cmd in commands)
+        {
+            Buffer.BlockCopy(cmd, 0, job, offset, cmd.Length);
+            offset += cmd.Length;
+        }
+        return job;
+    }
 }

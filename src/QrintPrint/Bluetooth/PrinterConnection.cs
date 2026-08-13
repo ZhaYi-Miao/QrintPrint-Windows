@@ -72,8 +72,18 @@ public sealed class PrinterConnection : IDisposable
     private BluetoothClient? _client;
     private Stream? _stream;
     private System.Threading.Timer? _pollTimer;
+    private System.Threading.Timer? _usbWatchTimer;
     private bool _foreground = true;
     private bool _busy;
+
+    /// <summary>USB 模式当前使用的打印机队列名（默认 BY288 USB RAW，手动选择时可为任意队列）</summary>
+    private string _usbQueueName = UsbTransport.QUEUE_NAME;
+
+    /// <summary>USB 模式当前使用的端口名（如 USB005），用于拔线检测</summary>
+    private string _usbPortName = "";
+
+    /// <summary>USB 心跳检测进行中标志，防止 Timer 并发触发重复检测</summary>
+    private bool _usbWatchBusy;
 
     /// <summary>当前传输方式</summary>
     public TransportMode CurrentTransport { get; private set; } = TransportMode.BLUETOOTH;
@@ -246,6 +256,8 @@ public sealed class PrinterConnection : IDisposable
 
             _status.ConnState = ConnState.CONNECTED;
             CurrentTransport = TransportMode.USB;
+            _usbQueueName = UsbTransport.QUEUE_NAME;
+            _usbPortName = device.PortName;
             // 队列可能被 Windows 标记为"脱机使用"，提前清掉，避免数据进了 spooler 却发不出去
             UsbTransport.EnsurePrinterOnline(UsbTransport.QUEUE_NAME);
             AppLog.Write("USB", $"USB 连接成功: {device.Name} @ {device.PortName} (队列已就绪)");
@@ -260,6 +272,64 @@ public sealed class PrinterConnection : IDisposable
 
         // USB 连接成功后，自动尝试连接蓝牙用于状态查询
         await TryConnectBluetoothForStatusAsync();
+
+        // 定期检查 USB 设备是否还在（拔掉线后自动更新连接状态）
+        StartUsbWatch();
+
+        return true;
+    }
+
+    /// <summary>
+    /// 连接一个用户手动指定的打印机队列（“显示所有打印机”里选的）。
+    /// 不创建队列、不做端口对齐 —— 队列已经存在，直接往里发 RAW 数据。
+    /// </summary>
+    public async Task<bool> ConnectQueueAsync(string queueName)
+    {
+        if (string.IsNullOrWhiteSpace(queueName))
+        {
+            _status.LastError = "打印机队列名为空";
+            return false;
+        }
+
+        Disconnect();
+        _status.DeviceId = queueName;
+        _status.DeviceName = queueName;
+        _status.ConnState = ConnState.CONNECTED;
+        CurrentTransport = TransportMode.USB;
+        _usbQueueName = queueName;
+        AppLog.Write("USB", $"已连接打印机队列: {queueName}");
+
+        // 反查队列绑定的 USB 端口和设备实例 ID。
+        // DeviceId 只有队列名时不含 VID/PID，拔线检测会直接跳过；
+        // 通过 usbmon 端口注册表反查出完整设备 ID，让检测对手动选择同样生效。
+        string portName = UsbTransport.GetQueuePort(queueName);
+        if (!string.IsNullOrEmpty(portName))
+        {
+            _usbPortName = portName;
+            string deviceId = UsbTransport.GetDeviceIdForPort(portName);
+            if (!string.IsNullOrEmpty(deviceId))
+            {
+                _status.DeviceId = deviceId;
+                AppLog.Write("USB", $"已从端口 {portName} 反查到设备实例: {deviceId}");
+            }
+            else
+            {
+                AppLog.Write("USB", $"端口 {portName} 未登记设备实例 ID，拔线检测将退化为端口登记检测");
+            }
+        }
+        else
+        {
+            AppLog.Write("USB", "未能从队列反查到 USB 端口，拔线检测不可用（队列可能挂在网络/IPP 端口）");
+        }
+
+        // 手动选择的队列也可能是脱机状态，提前清掉
+        UsbTransport.EnsurePrinterOnline(queueName);
+
+        // 自动尝试连蓝牙查状态（失败不影响打印）
+        await TryConnectBluetoothForStatusAsync();
+
+        // 手动队列的 DeviceId 是队列名，不含 VID/PID，跳过 USB 心跳检测
+        StartUsbWatch();
 
         return true;
     }
@@ -319,17 +389,14 @@ public sealed class PrinterConnection : IDisposable
     public void Disconnect()
     {
         StopPolling();
+        StopUsbWatch();
         lock (_rxLock) _rxBuffer.Clear();
         _busy = false;
         CurrentTransport = TransportMode.BLUETOOTH;
+        _usbQueueName = UsbTransport.QUEUE_NAME;
+        _usbPortName = "";
 
-        var stream = _stream;
-        var client = _client;
-        _stream = null;
-        _client = null;
-
-        try { stream?.Dispose(); } catch { }
-        try { client?.Dispose(); } catch { }
+        CloseBluetoothChannel();
 
         _status.ConnState = ConnState.DISCONNECTED;
         _status.Reset();
@@ -658,48 +725,12 @@ public sealed class PrinterConnection : IDisposable
         try
         {
             // 构建完整命令序列
-            var commands = new List<byte[]>();
-
-            // 1. 握手命令
-            commands.Add(QringProtocol.CMD_ENABLE);
-            commands.Add(QringProtocol.CMD_ENABLE2);
-
-            // 2. 浓度设置
-            if (thickness is { } t)
-            {
-                commands.Add(QringProtocol.CmdThickness(t));
-            }
-
-            // 3. 唤醒
-            commands.Add(QringProtocol.CMD_WAKEUP);
-
-            // 4. 走纸（前）
-            commands.AddRange(QringProtocol.CmdFeed(FEED_BEFORE));
-
-            // 5. 光栅头
-            commands.Add(QringProtocol.CmdRasterHeader(raster.WidthBytes, raster.Height, 0));
-
-            // 6. 光栅数据
-            commands.Add(raster.Data);
-
-            // 7. 走纸（后）
-            commands.AddRange(QringProtocol.CmdFeed(FEED_AFTER));
-
-            // 8. 停止
-            commands.Add(QringProtocol.CMD_STOP);
-
-            // 合并所有命令
-            int totalLength = commands.Sum(c => c.Length);
-            byte[] jobData = new byte[totalLength];
-            int offset = 0;
-            foreach (var cmd in commands)
-            {
-                Buffer.BlockCopy(cmd, 0, jobData, offset, cmd.Length);
-                offset += cmd.Length;
-            }
+            byte[] jobData = QringProtocol.BuildRasterPrintJob(
+                raster, thickness ?? DefaultThickness, FEED_BEFORE, FEED_AFTER);
 
             // 通过 USB 发送
-            int written = await Task.Run(() => UsbTransport.SendRaw(jobData, "QrintPrint Job"));
+            int written = await Task.Run(() =>
+                UsbTransport.SendRaw(jobData, _usbQueueName, "QrintPrint Job"));
             if (written <= 0)
             {
                 _status.LastError = "USB 发送失败";
@@ -743,6 +774,87 @@ public sealed class PrinterConnection : IDisposable
         var timer = _pollTimer;
         _pollTimer = null;
         timer?.Dispose();
+    }
+
+    /// <summary>
+    /// 启动 USB 设备存在性心跳：每 5 秒查一次设备是否还在系统中。
+    /// 打印机被拔掉后自动把连接状态改成"未连接"，界面不再一直显示已连接。
+    /// 自动识别与手动选队列两条路径都会记录可检测的设备 ID / 端口信息。
+    /// </summary>
+    private void StartUsbWatch()
+    {
+        StopUsbWatch();
+        if (CurrentTransport != TransportMode.USB) return;
+        _usbWatchTimer = new System.Threading.Timer(
+            _ => _ = UsbWatchTickAsync(),
+            null,
+            TimeSpan.FromSeconds(5),
+            TimeSpan.FromSeconds(5));
+    }
+
+    private void StopUsbWatch()
+    {
+        var timer = _usbWatchTimer;
+        _usbWatchTimer = null;
+        timer?.Dispose();
+    }
+
+    private async Task UsbWatchTickAsync()
+    {
+        if (CurrentTransport != TransportMode.USB)
+        {
+            StopUsbWatch();
+            return;
+        }
+        if (_usbWatchBusy) return;
+        _usbWatchBusy = true;
+        try
+        {
+            // 检测设备是否还在系统中。两种路径：
+            //  1. DeviceId 含 VID_（自动识别连接，或手动队列已反查到实例 ID）
+            //     → 直接查 Win32_PnPEntity，最可靠；
+            //  2. 只有 USB 端口名（如 USB005）
+            //     → 查 usbmon 端口登记是否还在（打印机被拔掉后登记会被删除）。
+            string deviceId = _status.DeviceId;
+            bool present;
+            if (deviceId.Contains("VID_", StringComparison.OrdinalIgnoreCase))
+            {
+                present = await Task.Run(() => UsbTransport.IsDevicePresent(deviceId));
+            }
+            else if (_usbPortName.StartsWith("USB", StringComparison.OrdinalIgnoreCase))
+            {
+                present = UsbTransport.IsPortPresent(_usbPortName);
+            }
+            else
+            {
+                // 队列挂在网络/IPP 端口，没有可检测的 USB 信息，跳过
+                return;
+            }
+            if (present) return;
+
+            AppLog.Write("USB", "检测到 USB 打印机已断开（设备/端口登记已消失），已更新连接状态");
+            StopUsbWatch();
+            StopPolling();
+            // 关闭可能存在的蓝牙状态通道，避免蓝牙还连着时界面误认为整体仍连接
+            CloseBluetoothChannel();
+            _status.ConnState = ConnState.DISCONNECTED;
+            _status.LastError = "USB 打印机已断开";
+        }
+        finally
+        {
+            _usbWatchBusy = false;
+        }
+    }
+
+    /// <summary>关闭蓝牙 socket/stream（不触碰 USB 相关状态）</summary>
+    private void CloseBluetoothChannel()
+    {
+        var stream = _stream;
+        var client = _client;
+        _stream = null;
+        _client = null;
+        try { stream?.Dispose(); } catch { }
+        try { client?.Dispose(); } catch { }
     }
 
     private async Task PollOnceAsync()

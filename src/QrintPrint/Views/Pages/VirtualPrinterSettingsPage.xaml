@@ -1,0 +1,96 @@
+<UserControl x:Class="QrintPrint.Views.Pages.VirtualPrinterSettingsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="360" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ═══ 左侧设置面板 ═══ -->
+        <Border Grid.Column="0"
+                Background="{DynamicResource Layer02Brush}"
+                BorderBrush="{DynamicResource ControlStrokeBrush}"
+                BorderThickness="0,0,1,0"
+                Padding="16">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <!-- 返回按钮 -->
+                    <Button Margin="0,0,0,12" Padding="8,6"
+                            HorizontalAlignment="Left"
+                            Click="BackBtn_Click"
+                            Content="← 返回首页" />
+
+                    <TextBlock Style="{StaticResource SubtitleText}" Text="虚拟打印设置" Margin="0,0,0,4" />
+                    <TextBlock Style="{StaticResource CaptionText}"
+                               Text="其他软件打印到「QrintPrint 虚拟打印机」时的排版参数" />
+
+                    <!-- 字号 -->
+                    <TextBlock Style="{StaticResource CaptionText}" Text="字号" Margin="0,20,0,4" />
+                    <StackPanel Orientation="Horizontal">
+                        <Slider x:Name="FontSizeSlider" Minimum="10" Maximum="64" Value="24"
+                                Width="220" TickFrequency="1" IsSnapToTickEnabled="True"
+                                ValueChanged="FontSizeSlider_ValueChanged" />
+                        <TextBlock x:Name="FontSizeLabel" Margin="8,0,0,0"
+                                   Style="{StaticResource BodyText}" Text="24" />
+                    </StackPanel>
+
+                    <!-- 行间距 -->
+                    <TextBlock Style="{StaticResource CaptionText}" Text="行间距" Margin="0,16,0,4" />
+                    <StackPanel Orientation="Horizontal">
+                        <Slider x:Name="LineSpacingSlider" Minimum="0" Maximum="40" Value="6"
+                                Width="220" TickFrequency="1" IsSnapToTickEnabled="True"
+                                ValueChanged="LineSpacingSlider_ValueChanged" />
+                        <TextBlock x:Name="LineSpacingLabel" Margin="8,0,0,0"
+                                   Style="{StaticResource BodyText}" Text="6" />
+                    </StackPanel>
+
+                    <!-- 边距 -->
+                    <TextBlock Style="{StaticResource CaptionText}" Text="左右边距" Margin="0,16,0,4" />
+                    <StackPanel Orientation="Horizontal">
+                        <Slider x:Name="MarginSlider" Minimum="0" Maximum="60" Value="8"
+                                Width="220" TickFrequency="1" IsSnapToTickEnabled="True"
+                                ValueChanged="MarginSlider_ValueChanged" />
+                        <TextBlock x:Name="MarginLabel" Margin="8,0,0,0"
+                                   Style="{StaticResource BodyText}" Text="8" />
+                    </StackPanel>
+
+                    <!-- 最大打印行数 -->
+                    <TextBlock Style="{StaticResource CaptionText}" Text="最大打印行数" Margin="0,16,0,4" />
+                    <StackPanel Orientation="Horizontal">
+                        <Slider x:Name="MaxLinesSlider" Minimum="0" Maximum="500" Value="0"
+                                Width="220" TickFrequency="10" IsSnapToTickEnabled="True"
+                                ValueChanged="MaxLinesSlider_ValueChanged" />
+                        <TextBlock x:Name="MaxLinesLabel" Margin="8,0,0,0"
+                                   Style="{StaticResource BodyText}" Text="0（不限制）" />
+                    </StackPanel>
+                    <TextBlock Style="{StaticResource CaptionText}" Margin="0,4,0,0"
+                               Text="防止网页内容过长打爆纸卷，超出的部分会被截断" />
+
+                    <!-- 网页图片打印 -->
+                    <CheckBox x:Name="PrintImagesCheck" Content="打印网页图片" Margin="0,20,0,0"
+                              Checked="PrintImagesCheck_Changed" Unchecked="PrintImagesCheck_Changed" />
+                    <TextBlock Style="{StaticResource CaptionText}" Margin="0,6,0,0"
+                               Text="当前文本打印通道不含图片数据（网页打印时图片会被系统丢弃），需配合 PDF 虚拟打印通道才能生效，暂未实现" TextWrapping="Wrap" />
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- ═══ 右侧说明区 ═══ -->
+        <Grid Grid.Column="1" Margin="24,0,0,0">
+            <StackPanel VerticalAlignment="Top">
+                <TextBlock Style="{StaticResource SubtitleText}" Text="使用方式" />
+                <TextBlock Style="{StaticResource BodyText}" Margin="0,8,0,0" TextWrapping="Wrap">
+                    <Run Text="1. 在「我的」页面启用虚拟打印机（首次需 UAC 授权），" />
+                    <Run Text="2. 在任意软件（Word、浏览器、订单系统）里按 Ctrl+P，打印机选择" />
+                    <Run Text="“QrintPrint 虚拟打印机”，" />
+                    <Run Text="3. 打印内容会按本页的参数排版后发送到已连接的 USB/蓝牙打印机。" />
+                </TextBlock>
+                <TextBlock Style="{StaticResource BodyText}" Margin="0,12,0,0" TextWrapping="Wrap">
+                    <Run Text="注意：虚拟打印需要保持 QrintPrint 主程序运行（TCP 接收模式），" />
+                    <Run Text="且需先在首页连接打印机。" />
+                </TextBlock>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</UserControl>
