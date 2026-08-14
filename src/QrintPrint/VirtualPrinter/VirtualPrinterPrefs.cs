@@ -53,9 +53,6 @@ public static class VirtualPrinterPrefs
     /// <summary>最大打印行数（0 = 不限制，防止内容过长打爆纸卷）</summary>
     public static int MaxLines { get; set; }
 
-    /// <summary>网页图片打印（当前 TCP 文本通道不含图片数据，需配合 PDF 虚拟打印通道）</summary>
-    public static bool PrintImages { get; set; }
-
     /// <summary>随应用发布的 RedMon DLL 文件名（64 位系统用 redmon64.dll）</summary>
     public static string RedMonDll { get; set; } = "redmon64.dll";
 
@@ -105,9 +102,6 @@ public static class VirtualPrinterPrefs
                 if (root.TryGetProperty("maxLines", out var ml)
                     && ml.ValueKind == JsonValueKind.Number)
                     MaxLines = Math.Clamp(ml.GetInt32(), 0, 10000);
-                if (root.TryGetProperty("printImages", out var pi)
-                    && (pi.ValueKind == JsonValueKind.True || pi.ValueKind == JsonValueKind.False))
-                    PrintImages = pi.GetBoolean();
             }
         }
         catch
@@ -133,7 +127,6 @@ public static class VirtualPrinterPrefs
                 lineSpacing = LineSpacing,
                 margin = Margin,
                 maxLines = MaxLines,
-                printImages = PrintImages,
             };
             File.WriteAllText(GetPath(), JsonSerializer.Serialize(payload));
         }

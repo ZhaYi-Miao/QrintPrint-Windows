@@ -204,4 +204,150 @@
     <!-- 默认按钮样式 -->
     <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}" />
 
+    <!-- ── 全局控件样式（WinUI 风格化） ──────────────────────────────
+         让 TextBox / CheckBox / ComboBox / Slider 等全部跟随设计令牌，
+         避免 WPF 系统默认外观与主题不协调。 -->
+
+    <!-- 全局默认字体（未显式指定样式的文本统一） -->
+    <Style TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource ContentFontFamily}" />
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+    </Style>
+
+    <!-- 文本框：圆角 + 品牌色焦点边框 -->
+    <Style TargetType="TextBox">
+        <Setter Property="FontFamily" Value="{StaticResource ContentFontFamily}" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+        <Setter Property="Background" Value="{StaticResource Layer01Brush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource ControlStrokeBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="8,3" />
+        <Setter Property="CaretBrush" Value="{StaticResource AccentDefaultBrush}" />
+        <Setter Property="SelectionBrush" Value="{StaticResource AccentSoftStrongBrush}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <Border x:Name="Bd"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="4">
+                        <ScrollViewer x:Name="PART_ContentHost"
+                                      Margin="{TemplateBinding Padding}" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource AccentDefaultBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource Layer03Brush}" />
+                            <Setter TargetName="Bd" Property="Opacity" Value="0.6" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- 密码框（与文本框一致） -->
+    <Style TargetType="PasswordBox">
+        <Setter Property="FontFamily" Value="{StaticResource ContentFontFamily}" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+        <Setter Property="Background" Value="{StaticResource Layer01Brush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource ControlStrokeBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="8,3" />
+        <Setter Property="CaretBrush" Value="{StaticResource AccentDefaultBrush}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="PasswordBox">
+                    <Border x:Name="Bd"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="4">
+                        <ScrollViewer x:Name="PART_ContentHost"
+                                      Margin="{TemplateBinding Padding}" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource AccentDefaultBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource Layer03Brush}" />
+                            <Setter TargetName="Bd" Property="Opacity" Value="0.6" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- 多行文本框别名（继承 TextBox 样式） -->
+    <Style TargetType="RichTextBox">
+        <Setter Property="FontFamily" Value="{StaticResource ContentFontFamily}" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+        <Setter Property="Background" Value="{StaticResource Layer01Brush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource ControlStrokeBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="8,6" />
+    </Style>
+
+    <!-- 下拉框：统一字体与配色（沿用系统扁平模板） -->
+    <Style TargetType="ComboBox">
+        <Setter Property="FontFamily" Value="{StaticResource ContentFontFamily}" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+        <Setter Property="Background" Value="{StaticResource Layer01Brush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource ControlStrokeBrush}" />
+        <Setter Property="Padding" Value="8,6" />
+    </Style>
+
+    <!-- 复选 / 单选：统一字体配色 -->
+    <Style TargetType="CheckBox">
+        <Setter Property="FontFamily" Value="{StaticResource ContentFontFamily}" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style TargetType="RadioButton">
+        <Setter Property="FontFamily" Value="{StaticResource ContentFontFamily}" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+
+    <!-- 滑块：品牌色（选中轨道与滑块） -->
+    <Style TargetType="Slider">
+        <Setter Property="Foreground" Value="{StaticResource AccentDefaultBrush}" />
+    </Style>
+
+    <!-- 列表：透明无边框 -->
+    <Style TargetType="ListBox">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="FontFamily" Value="{StaticResource ContentFontFamily}" />
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+    </Style>
+
+    <!-- ── 矢量图标（Path 绘制，避免字体字形缺失显示方框） ────────────── -->
+
+    <!-- 照片打印：相框 + 太阳 + 山 -->
+    <Geometry x:Key="IconPhoto">M3,3 H17 V13 H3 Z M8,6.5 m-1.5,0 a1.5,1.5 0 1 0 3,0 a1.5,1.5 0 1 0 -3,0 M3,11.5 L7,7.5 L10,10.5 L13,7.5 L17,12</Geometry>
+
+    <!-- 文本打印：三行段落 -->
+    <Geometry x:Key="IconText">M3,5 H15 M3,9.5 H15 M3,14 H9</Geometry>
+
+    <!-- 条码打印：竖线组 -->
+    <Geometry x:Key="IconBarcode">M3,3.5 V16.5 M6,3.5 V16.5 M9,3.5 V16.5 M12,3.5 V9.5 M15,3.5 V16.5 M18,3.5 V16.5</Geometry>
+
+    <!-- 自定义打印：加号 -->
+    <Geometry x:Key="IconCustom">M10,3.5 V16.5 M3.5,10 H16.5</Geometry>
+
+    <!-- 虚拟打印：打印机 -->
+    <Geometry x:Key="IconPrinter">M3,6.5 H17 V14 H3 Z M5,3.5 H15 V6.5 H5 Z M5,14 V17.5 H15 V14 M3,10.5 H5.5</Geometry>
+
 </ResourceDictionary>

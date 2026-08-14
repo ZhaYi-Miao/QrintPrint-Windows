@@ -77,6 +77,15 @@
                     </StackPanel>
                     <TextBlock Margin="0,4,0,0" Style="{StaticResource CaptionText}"
                                Text="设置新建打印任务时的默认浓度等级（1-5）" />
+
+                    <TextBlock Style="{StaticResource CaptionText}" Text="纸张宽度" Margin="0,16,0,4" />
+                    <ComboBox x:Name="PaperWidthCombo" Width="140" HorizontalAlignment="Left"
+                              SelectionChanged="PaperWidthCombo_SelectionChanged">
+                        <ComboBoxItem Tag="50" Content="50mm（默认）" />
+                        <ComboBoxItem Tag="57" Content="57mm" />
+                    </ComboBox>
+                    <TextBlock Margin="0,4,0,0" Style="{StaticResource CaptionText}" TextWrapping="Wrap"
+                               Text="按实际使用的热敏纸宽度选择，所有预览的纸条宽度随之变化；打印内容宽度固定为打印头 48mm，自动居中" />
                 </StackPanel>
             </Border>
 
@@ -240,13 +249,27 @@
                 <StackPanel>
                     <TextBlock Style="{StaticResource BodyStrongText}" Text="QrintPrint" />
                     <TextBlock Margin="0,4,0,0" Style="{StaticResource CaptionText}"
-                               Text="错题小印 Windows 版 v1.1.0" />
+                               Text="错题小印 Windows 版 v1.1.1" />
                     <TextBlock Margin="0,8,0,0" Style="{StaticResource CaptionText}"
                                Text="基于 Qring 私有协议，支持文本、照片、条码、自定义画布打印" />
                     <TextBlock Margin="0,12,0,0" Style="{StaticResource CaptionText}"
                                Text="ZhaYi &amp; DeepSeek" />
                     <TextBlock Margin="0,8,0,0" Style="{StaticResource CaptionText}"
                                Text="打印机交流群号：419668261" />
+                    <TextBlock Margin="0,12,0,0" Style="{StaticResource CaptionText}" TextWrapping="Wrap">
+                        <Run Text="GitHub 仓库：" />
+                        <Hyperlink RequestNavigate="Hyperlink_RequestNavigate"
+                                   NavigateUri="https://github.com/ZhaYi-Miao/QrintPrint-Windows">
+                            QrintPrint-Windows（桌面程序）
+                        </Hyperlink>
+                    </TextBlock>
+                    <TextBlock Margin="0,4,0,0" Style="{StaticResource CaptionText}" TextWrapping="Wrap">
+                        <Run Text="Web 控制台：" />
+                        <Hyperlink RequestNavigate="Hyperlink_RequestNavigate"
+                                   NavigateUri="https://github.com/ZhaYi-Miao/QrintPrint-Web-Console">
+                            QrintPrint-Web-Console（网页打印面板）
+                        </Hyperlink>
+                    </TextBlock>
                 </StackPanel>
             </Border>
         </StackPanel>

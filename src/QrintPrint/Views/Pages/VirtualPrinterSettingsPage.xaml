@@ -66,12 +66,6 @@
                     </StackPanel>
                     <TextBlock Style="{StaticResource CaptionText}" Margin="0,4,0,0"
                                Text="防止网页内容过长打爆纸卷，超出的部分会被截断" />
-
-                    <!-- 网页图片打印 -->
-                    <CheckBox x:Name="PrintImagesCheck" Content="打印网页图片" Margin="0,20,0,0"
-                              Checked="PrintImagesCheck_Changed" Unchecked="PrintImagesCheck_Changed" />
-                    <TextBlock Style="{StaticResource CaptionText}" Margin="0,6,0,0"
-                               Text="当前文本打印通道不含图片数据（网页打印时图片会被系统丢弃），需配合 PDF 虚拟打印通道才能生效，暂未实现" TextWrapping="Wrap" />
                 </StackPanel>
             </ScrollViewer>
         </Border>

@@ -3,77 +3,93 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" MinHeight="240" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- 打印机状态卡 + 快捷操作宫格,按草图布局 -->
-        <Grid Grid.Row="0" Margin="0,0,0,20">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="240" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
+        <!-- ═══ 顶部状态横条 ═══ -->
+        <Border Grid.Row="0"
+                Background="{DynamicResource Layer02Brush}"
+                BorderBrush="{DynamicResource ControlStrokeBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="16,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
 
-            <!-- ═══ 打印机状态卡 ═══ -->
-            <Border Grid.Column="0"
-                    Background="{DynamicResource Layer02Brush}"
-                    BorderBrush="{DynamicResource ControlStrokeBrush}"
-                    BorderThickness="1"
-                    CornerRadius="8"
-                    Padding="16">
-                <StackPanel>
-                    <TextBlock Style="{StaticResource SubtitleText}" Text="打印机状态" />
-
-                    <!-- 连接指示行 -->
-                    <StackPanel Orientation="Horizontal" Margin="0,12,0,16">
-                        <Ellipse x:Name="StatusDot" Width="8" Height="8"
-                                 Fill="{DynamicResource TextTertiaryBrush}"
-                                 VerticalAlignment="Center" />
-                        <TextBlock x:Name="StatusLabel" Margin="8,0,0,0"
-                                   Style="{StaticResource CaptionText}"
-                                   Text="未连接" />
-                    </StackPanel>
-
-                    <Border BorderBrush="{DynamicResource DividerStrokeBrush}"
-                            BorderThickness="0,0,0,1" Margin="0,0,0,8" />
-
-                    <!-- 状态明细 -->
-                    <StackPanel Orientation="Horizontal" Margin="0,4">
-                        <TextBlock Style="{StaticResource CaptionText}" Width="56" Text="电量" />
-                        <TextBlock x:Name="BatteryValue" Style="{StaticResource BodyStrongText}"
-                                   HorizontalAlignment="Right" Text="—" />
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,4">
-                        <TextBlock Style="{StaticResource CaptionText}" Width="56" Text="纸张" />
-                        <TextBlock x:Name="PaperValue" Style="{StaticResource BodyStrongText}"
-                                   HorizontalAlignment="Right" Text="—" />
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,4">
-                        <TextBlock Style="{StaticResource CaptionText}" Width="56" Text="机器状态" />
-                        <TextBlock x:Name="HardwareValue" Style="{StaticResource BodyStrongText}"
-                                   HorizontalAlignment="Right" Text="—" />
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,4">
-                        <TextBlock Style="{StaticResource CaptionText}" Width="56" Text="浓度" />
-                        <TextBlock x:Name="ThicknessValue" Style="{StaticResource BodyStrongText}"
-                                   HorizontalAlignment="Right" Text="—" />
-                    </StackPanel>
-
-                    <!-- 连接/断开按钮 -->
-                    <Button x:Name="ConnBtn" Margin="0,16,0,0" Padding="12,8"
-                            HorizontalAlignment="Stretch"
-                            Click="ConnBtn_Click"
-                            Content="连接打印机" />
+                <!-- 连接指示 -->
+                <StackPanel Orientation="Horizontal" Grid.Column="0" VerticalAlignment="Center">
+                    <Ellipse x:Name="StatusDot" Width="8" Height="8"
+                             Fill="{DynamicResource TextTertiaryBrush}"
+                             VerticalAlignment="Center" />
+                    <TextBlock x:Name="StatusLabel" Margin="8,0,0,0"
+                               Style="{StaticResource BodyStrongText}"
+                               Text="未连接" />
                 </StackPanel>
-            </Border>
 
-            <!-- ═══ 快捷操作 2×2 宫格 ═══ -->
-            <UniformGrid Grid.Column="1" Columns="2" Rows="2" Margin="16,0,0,0" MinHeight="200">
-                <Button Style="{StaticResource QuickActionButton}" Margin="0,0,8,8" Padding="16,20"
-                        Click="QuickAction_Click" Tag="image" MinHeight="80">
+                <!-- 分隔线 -->
+                <Border Grid.Column="1"
+                        BorderBrush="{DynamicResource DividerStrokeBrush}"
+                        BorderThickness="1,0,0,0"
+                        Margin="16,4" />
+
+                <!-- 状态明细 -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,16,0">
+                        <TextBlock Style="{StaticResource CaptionText}" VerticalAlignment="Center" Text="电量" />
+                        <TextBlock x:Name="BatteryValue" Margin="6,0,0,0"
+                                   Style="{StaticResource BodyStrongText}" VerticalAlignment="Center" Text="—" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,16,0">
+                        <TextBlock Style="{StaticResource CaptionText}" VerticalAlignment="Center" Text="纸张" />
+                        <TextBlock x:Name="PaperValue" Margin="6,0,0,0"
+                                   Style="{StaticResource BodyStrongText}" VerticalAlignment="Center" Text="—" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,16,0">
+                        <TextBlock Style="{StaticResource CaptionText}" VerticalAlignment="Center" Text="机器状态" />
+                        <TextBlock x:Name="HardwareValue" Margin="6,0,0,0"
+                                   Style="{StaticResource BodyStrongText}" VerticalAlignment="Center" Text="—" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource CaptionText}" VerticalAlignment="Center" Text="浓度" />
+                        <TextBlock x:Name="ThicknessValue" Margin="6,0,0,0"
+                                   Style="{StaticResource BodyStrongText}" VerticalAlignment="Center" Text="—" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- 连接按钮 -->
+                <Button x:Name="ConnBtn" Grid.Column="4" Padding="16,8"
+                        VerticalAlignment="Center"
+                        Click="ConnBtn_Click"
+                        Content="连接打印机" />
+            </Grid>
+        </Border>
+
+        <!-- ═══ 快捷打印 ═══ -->
+        <StackPanel Grid.Row="1" Margin="0,20,0,0">
+            <TextBlock Style="{StaticResource SubtitleText}" Text="快捷打印" />
+            <TextBlock Margin="0,4,0,12" Style="{StaticResource CaptionText}"
+                       Text="常用打印功能，点击进入对应页面" />
+            <UniformGrid Columns="4" Rows="1">
+                <Button Style="{StaticResource QuickActionButton}" Margin="0,0,8,0" Padding="12,20"
+                        Click="QuickAction_Click" Tag="image" MinHeight="104">
                     <StackPanel IsHitTestVisible="False">
-                        <TextBlock Style="{StaticResource SubtitleText}"
+                        <Path Data="{StaticResource IconPhoto}" Stretch="Uniform"
+                              Width="26" Height="26"
+                              HorizontalAlignment="Center"
+                              Stroke="{DynamicResource TextSecondaryBrush}"
+                              StrokeThickness="2"
+                              StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                              IsHitTestVisible="False" />
+                        <TextBlock Margin="0,8,0,0" Style="{StaticResource BodyStrongText}"
                                    HorizontalAlignment="Center" Text="照片打印"
                                    IsHitTestVisible="False" />
                         <TextBlock Margin="0,4,0,0" Style="{StaticResource CaptionText}"
@@ -81,10 +97,17 @@
                                    IsHitTestVisible="False" />
                     </StackPanel>
                 </Button>
-                <Button Style="{StaticResource QuickActionButton}" Margin="8,0,0,8" Padding="16,20"
-                        Click="QuickAction_Click" Tag="text" MinHeight="80">
+                <Button Style="{StaticResource QuickActionButton}" Margin="8,0,8,0" Padding="12,20"
+                        Click="QuickAction_Click" Tag="text" MinHeight="104">
                     <StackPanel IsHitTestVisible="False">
-                        <TextBlock Style="{StaticResource SubtitleText}"
+                        <Path Data="{StaticResource IconText}" Stretch="Uniform"
+                              Width="26" Height="26"
+                              HorizontalAlignment="Center"
+                              Stroke="{DynamicResource TextSecondaryBrush}"
+                              StrokeThickness="2"
+                              StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                              IsHitTestVisible="False" />
+                        <TextBlock Margin="0,8,0,0" Style="{StaticResource BodyStrongText}"
                                    HorizontalAlignment="Center" Text="文本打印"
                                    IsHitTestVisible="False" />
                         <TextBlock Margin="0,4,0,0" Style="{StaticResource CaptionText}"
@@ -92,10 +115,17 @@
                                    IsHitTestVisible="False" />
                     </StackPanel>
                 </Button>
-                <Button Style="{StaticResource QuickActionButton}" Margin="0,8,8,0" Padding="16,20"
-                        Click="QuickAction_Click" Tag="code" MinHeight="80">
+                <Button Style="{StaticResource QuickActionButton}" Margin="8,0,8,0" Padding="12,20"
+                        Click="QuickAction_Click" Tag="code" MinHeight="104">
                     <StackPanel IsHitTestVisible="False">
-                        <TextBlock Style="{StaticResource SubtitleText}"
+                        <Path Data="{StaticResource IconBarcode}" Stretch="Uniform"
+                              Width="26" Height="26"
+                              HorizontalAlignment="Center"
+                              Stroke="{DynamicResource TextSecondaryBrush}"
+                              StrokeThickness="2"
+                              StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                              IsHitTestVisible="False" />
+                        <TextBlock Margin="0,8,0,0" Style="{StaticResource BodyStrongText}"
                                    HorizontalAlignment="Center" Text="条码打印"
                                    IsHitTestVisible="False" />
                         <TextBlock Margin="0,4,0,0" Style="{StaticResource CaptionText}"
@@ -103,10 +133,17 @@
                                    IsHitTestVisible="False" />
                     </StackPanel>
                 </Button>
-                <Button Style="{StaticResource QuickActionButton}" Margin="8,8,0,0" Padding="16,20"
-                        Click="QuickAction_Click" Tag="custom" MinHeight="80">
+                <Button Style="{StaticResource QuickActionButton}" Margin="8,0,0,0" Padding="12,20"
+                        Click="QuickAction_Click" Tag="custom" MinHeight="104">
                     <StackPanel IsHitTestVisible="False">
-                        <TextBlock Style="{StaticResource SubtitleText}"
+                        <Path Data="{StaticResource IconCustom}" Stretch="Uniform"
+                              Width="26" Height="26"
+                              HorizontalAlignment="Center"
+                              Stroke="{DynamicResource TextSecondaryBrush}"
+                              StrokeThickness="2"
+                              StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                              IsHitTestVisible="False" />
+                        <TextBlock Margin="0,8,0,0" Style="{StaticResource BodyStrongText}"
                                    HorizontalAlignment="Center" Text="自定义打印"
                                    IsHitTestVisible="False" />
                         <TextBlock Margin="0,4,0,0" Style="{StaticResource CaptionText}"
@@ -115,16 +152,16 @@
                     </StackPanel>
                 </Button>
             </UniformGrid>
-        </Grid>
+        </StackPanel>
 
-        <!-- ═══ 文档打印区域 ═══ -->
-        <Border Grid.Row="1"
+        <!-- ═══ 文档打印 ═══ -->
+        <Border Grid.Row="2"
                 Background="{DynamicResource Layer02Brush}"
                 BorderBrush="{DynamicResource ControlStrokeBrush}"
                 BorderThickness="1"
                 CornerRadius="8"
                 Padding="16"
-                Margin="0,0,0,16">
+                Margin="0,20,0,0">
             <StackPanel>
                 <TextBlock Style="{StaticResource SubtitleText}" Text="文档打印" />
                 <TextBlock Margin="0,4,0,12" Style="{StaticResource CaptionText}"
@@ -181,20 +218,46 @@
                         </StackPanel>
                     </Button>
                 </WrapPanel>
-                <Border BorderBrush="{DynamicResource DividerStrokeBrush}"
-                        BorderThickness="0,1,0,0" Margin="0,8,0,12" />
-                <Button Style="{StaticResource QuickActionButton}" Padding="24,12"
-                        Click="QuickAction_Click" Tag="vprint" MinHeight="48"
-                        HorizontalAlignment="Left">
-                    <StackPanel Orientation="Horizontal" IsHitTestVisible="False">
-                        <TextBlock Style="{StaticResource BodyStrongText}"
-                                   Text="虚拟打印" />
-                        <TextBlock Margin="8,0,0,0" Style="{StaticResource CaptionText}"
-                                   VerticalAlignment="Center"
-                                   Text="任意软件 Ctrl+P 直接打印" />
-                    </StackPanel>
-                </Button>
             </StackPanel>
+        </Border>
+
+        <!-- ═══ 虚拟打印 ═══ -->
+        <Border Grid.Row="3"
+                Margin="0,20,0,0"
+                Background="{DynamicResource Layer02Brush}"
+                BorderBrush="{DynamicResource ControlStrokeBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                VerticalAlignment="Top">
+            <Button Style="{StaticResource QuickActionButton}" Padding="16,14"
+                    HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                    Click="QuickAction_Click" Tag="vprint">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Path Data="{StaticResource IconPrinter}" Stretch="Uniform"
+                          Width="20" Height="20"
+                          VerticalAlignment="Center"
+                          Stroke="{DynamicResource TextSecondaryBrush}"
+                          StrokeThickness="2"
+                          StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                          IsHitTestVisible="False" />
+                    <TextBlock Grid.Column="1" Margin="8,0,0,0"
+                               Style="{StaticResource BodyStrongText}"
+                               VerticalAlignment="Center"
+                               Text="虚拟打印"
+                               IsHitTestVisible="False" />
+                    <TextBlock x:Name="VPrintStatusText" Grid.Column="3" Margin="12,0,0,0"
+                               Style="{StaticResource CaptionText}"
+                               VerticalAlignment="Center"
+                               Text="未启用 · 任意软件 Ctrl+P 直接打印"
+                               IsHitTestVisible="False" />
+                </Grid>
+            </Button>
         </Border>
     </Grid>
 </UserControl>

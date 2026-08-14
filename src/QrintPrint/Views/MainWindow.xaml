@@ -103,7 +103,7 @@
                         <TextBlock Text="首页" />
                     </ListBoxItem>
                     <ListBoxItem>
-                        <TextBlock Text="模版" />
+                        <TextBlock Text="模板" />
                     </ListBoxItem>
                     <ListBoxItem>
                         <TextBlock Text="历史" />

@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using QrintPrint.Bluetooth;
 using QrintPrint.Helpers;
 using QrintPrint.Models;
+using QrintPrint.VirtualPrinter;
 
 namespace QrintPrint.Views.Pages;
 
@@ -17,6 +18,16 @@ public partial class HomePage : UserControl, IPage
         var status = PrinterConnection.Instance.Status;
         status.PropertyChanged += OnStatusChanged;
         RefreshStatusCard();
+        RefreshVPrintStatus();
+    }
+
+    /// <summary>刷新底部虚拟打印入口的状态提示</summary>
+    private void RefreshVPrintStatus()
+    {
+        if (VPrintStatusText is null) return;
+        VPrintStatusText.Text = VirtualPrinterPrefs.Enabled
+            ? "已启用 · 任意软件 Ctrl+P 直接打印"
+            : "未启用 · 任意软件 Ctrl+P 直接打印";
     }
 
     private void OnStatusChanged(object? sender, PropertyChangedEventArgs e) =>

@@ -76,6 +76,12 @@ public partial class BarcodePrintPage : UserControl, IPage
         GenerateAndPreview();
     }
 
+    private void HriPrefixBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (HriPrefixBox is null) return;
+        GenerateAndPreview();
+    }
+
     private void GenerateAndPreview()
     {
         string content = CodeContent.Text;
@@ -112,18 +118,25 @@ public partial class BarcodePrintPage : UserControl, IPage
             {
                 int w = matrix.Width;
                 int h = matrix.Height;
-                _currentWidth = w;
-                _currentHeight = h;
-                _currentBinary = new byte[w * h];
+                var binary = new byte[w * h];
                 for (int y = 0; y < h; y++)
                 {
                     for (int x = 0; x < w; x++)
                     {
-                        _currentBinary[y * w + x] = matrix[x, y] ? (byte)1 : (byte)0;
+                        binary[y * w + x] = matrix[x, y] ? (byte)1 : (byte)0;
                     }
                 }
 
-                var bmp = RasterEncoder.BinaryToPreviewBitmap(_currentBinary, w, h, transparentWhite: true);
+                // 条码下方渲染对应的内容文本（HRI），方便人工核对；
+                // 前缀（如 "SN:"）只加在文字前，不参与条码图形
+                string hri = (HriPrefixBox?.Text ?? string.Empty) + content;
+                AppendHriText(ref binary, ref w, ref h, hri);
+
+                _currentWidth = w;
+                _currentHeight = h;
+                _currentBinary = binary;
+
+                var bmp = RasterEncoder.BinaryToPreviewBitmap(binary, w, h, transparentWhite: true);
                 PreviewImage.Source = bmp;
             }
         }
@@ -131,6 +144,41 @@ public partial class BarcodePrintPage : UserControl, IPage
         {
             System.Diagnostics.Debug.WriteLine($"条码生成失败: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// 在条码二值图下方追加内容文本（HRI 数字），水平居中。
+    /// 复用文本渲染管线：内容先渲染成点阵，再拼接到条码下方。
+    /// </summary>
+    private static void AppendHriText(ref byte[] binary, ref int w, ref int h, string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return;
+
+        var opts = new RasterEncoder.TextRenderOptions
+        {
+            FontFamily = string.Empty,
+            FontSize = 20,
+            Bold = false,
+            Margin = 6,
+            LineSpacing = 0,
+        };
+
+        // 按内容自然宽度渲染（不占满整幅），再水平居中
+        int contentW = RasterEncoder.MeasureTextContentWidth(text, opts, w);
+        using var img = RasterEncoder.RenderTextToImageIn(text, opts, contentW);
+        var gray = RasterEncoder.ImageToGrayRaw(img);
+        var textBinary = Dither.DitherToBinary(gray, DitherMode.NONE, RasterEncoder.THRESHOLD_IMAGE);
+
+        // 条码与文本之间留 4 点空白
+        const int gap = 4;
+        int newH = h + gap + gray.Height;
+        var canvas = Compositor.CreateBinaryCanvas(w, newH);
+        Compositor.BlitBinary(canvas, w, newH, binary, w, h, 0, 0);
+        int textX = Math.Max(0, (w - gray.Width) / 2);
+        Compositor.BlitBinary(canvas, w, newH, textBinary, gray.Width, gray.Height, textX, h + gap);
+
+        binary = canvas;
+        h = newH;
     }
 
     private async void PrintBtn_Click(object sender, RoutedEventArgs e)

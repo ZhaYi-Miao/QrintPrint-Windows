@@ -27,7 +27,6 @@ public partial class VirtualPrinterSettingsPage : UserControl, IPage
         LineSpacingSlider.Value = VirtualPrinterPrefs.LineSpacing;
         MarginSlider.Value = VirtualPrinterPrefs.Margin;
         MaxLinesSlider.Value = VirtualPrinterPrefs.MaxLines;
-        PrintImagesCheck.IsChecked = VirtualPrinterPrefs.PrintImages;
         RefreshLabels();
     }
 
@@ -76,21 +75,6 @@ public partial class VirtualPrinterSettingsPage : UserControl, IPage
         RefreshLabels();
         VirtualPrinterPrefs.MaxLines = (int)MaxLinesSlider.Value;
         VirtualPrinterPrefs.Save();
-    }
-
-    private void PrintImagesCheck_Changed(object sender, RoutedEventArgs e)
-    {
-        if (!_ready) return;
-        VirtualPrinterPrefs.PrintImages = PrintImagesCheck.IsChecked == true;
-        VirtualPrinterPrefs.Save();
-
-        if (VirtualPrinterPrefs.PrintImages)
-        {
-            MessageBox.Show(
-                "网页图片打印当前需要 PDF 虚拟打印通道才能生效，该通道尚未实现。\n" +
-                "目前（TCP 文本通道）打印时网页图片仍会被系统丢弃。",
-                "提示", MessageBoxButton.OK, MessageBoxImage.Information);
-        }
     }
 
     private void BackBtn_Click(object sender, RoutedEventArgs e)

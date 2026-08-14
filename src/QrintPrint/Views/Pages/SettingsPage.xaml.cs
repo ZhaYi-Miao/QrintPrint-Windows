@@ -74,6 +74,19 @@ public partial class SettingsPage : UserControl, IPage
         PrinterConnection.Instance.DefaultThickness = (byte)DefaultThicknessSlider.Value;
     }
 
+    /// <summary>纸张宽度切换 → 保存；预览纸条宽度随配置变化（各页面进入时读取）</summary>
+    private void PaperWidthCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_apiReady) return;
+        if (PaperWidthCombo.SelectedItem is not ComboBoxItem item
+            || item.Tag is not string tag) return;
+
+        int mm = tag == "57" ? 57 : 50;
+        if (mm == AppPrefs.PaperWidthMm) return;
+        AppPrefs.PaperWidthMm = mm;
+        AppPrefs.Save();
+    }
+
     private void ForgetDeviceBtn_Click(object sender, RoutedEventArgs e)
     {
         var result = MessageBox.Show("确定忘记当前设备？下次需要重新配对连接。", "确认",
@@ -109,6 +122,7 @@ public partial class SettingsPage : UserControl, IPage
         VpModeCombo.SelectedIndex =
             VirtualPrinterPrefs.Mode.Equals("redmon", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
         VpEnableCheck.IsChecked = VirtualPrinterPrefs.Enabled;
+        PaperWidthCombo.SelectedIndex = AppPrefs.PaperWidthMm >= 57 ? 1 : 0;
         BuildPermissionPanel();
         RefreshKeyList();
         _apiReady = true;
@@ -456,5 +470,24 @@ public partial class SettingsPage : UserControl, IPage
         {
             // 打不开目录时忽略
         }
+    }
+
+    /// <summary>关于区 GitHub 链接 → 用系统默认浏览器打开</summary>
+    private void Hyperlink_RequestNavigate(object sender, System.Windows.Navigation.RequestNavigateEventArgs e)
+    {
+        if (e.Uri is null) return;
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = e.Uri.ToString(),
+                UseShellExecute = true,
+            });
+        }
+        catch
+        {
+            // 打不开浏览器时忽略
+        }
+        e.Handled = true;
     }
 }

@@ -24,16 +24,23 @@
                     <TextBlock Style="{StaticResource SubtitleText}" Text="照片打印" Margin="0,0,0,16" />
                     
 
-                    <!-- 图片选择 -->
+                    <!-- 图片选择（支持多选） -->
                     <TextBlock Style="{StaticResource CaptionText}" Text="选择图片" Margin="0,0,0,4" />
                     <Button x:Name="PickBtn" Padding="0,10"
                             HorizontalAlignment="Stretch"
                             Click="PickBtn_Click"
-                            Content="选择图片文件" />
+                            Content="选择图片（可多选）" />
 
                     <TextBlock x:Name="FileNameLabel" Margin="0,8,0,0"
                                Style="{StaticResource CaptionText}"
                                Text="未选择图片" />
+
+                    <!-- 已选图片列表 -->
+                    <ListBox x:Name="ImageListBox" Height="120" Margin="0,8,0,0"
+                             SelectionChanged="ImageListBox_SelectionChanged" />
+                    <Button x:Name="RemoveBtn" Margin="0,8,0,0" Padding="8,4"
+                            HorizontalAlignment="Left"
+                            Click="RemoveBtn_Click" Content="移除选中" />
 
                     <!-- 抖动算法 -->
                     <TextBlock Style="{StaticResource CaptionText}" Text="抖动算法" Margin="0,20,0,4" />
@@ -61,6 +68,40 @@
                                    Style="{StaticResource BodyText}" Text="3" />
                     </StackPanel>
 
+                    <!-- 打印尺寸 -->
+                    <TextBlock Style="{StaticResource CaptionText}" Text="打印尺寸" Margin="0,20,0,4" />
+                    <StackPanel Orientation="Horizontal">
+                        <Slider x:Name="ScaleSlider" Minimum="50" Maximum="100" Value="100"
+                                Width="200" TickFrequency="10" IsSnapToTickEnabled="True"
+                                ValueChanged="ScaleSlider_ValueChanged" />
+                        <TextBlock x:Name="ScaleLabel" Margin="8,0,0,0"
+                                   Style="{StaticResource BodyText}" Text="100%" />
+                    </StackPanel>
+                    <TextBlock Margin="0,4,0,0" Style="{StaticResource CaptionText}"
+                               Text="打印宽度比例，小于 100% 时自动居中" />
+
+                    <!-- 图片方向 -->
+                    <TextBlock Style="{StaticResource CaptionText}" Text="图片方向" Margin="0,16,0,4" />
+                    <ComboBox x:Name="RotationCombo" Width="160" HorizontalAlignment="Left"
+                              SelectionChanged="RotationCombo_SelectionChanged">
+                        <ComboBoxItem Content="0°（原始）" />
+                        <ComboBoxItem Content="90°（顺时针）" />
+                        <ComboBoxItem Content="180°（倒置）" />
+                        <ComboBoxItem Content="270°（逆时针）" />
+                    </ComboBox>
+
+                    <!-- 图片间隔 -->
+                    <TextBlock Style="{StaticResource CaptionText}" Text="图片间隔" Margin="0,16,0,4" />
+                    <StackPanel Orientation="Horizontal">
+                        <Slider x:Name="GapSlider" Minimum="0" Maximum="50" Value="10"
+                                Width="200" TickFrequency="1" IsSnapToTickEnabled="True"
+                                ValueChanged="GapSlider_ValueChanged" />
+                        <TextBlock x:Name="GapLabel" Margin="8,0,0,0"
+                                   Style="{StaticResource BodyText}" Text="10 mm" />
+                    </StackPanel>
+                    <TextBlock Margin="0,4,0,0" Style="{StaticResource CaptionText}"
+                               Text="批量打印时每张图片之间的走纸距离" />
+
                     <!-- 打印按钮 -->
                     <Button x:Name="PrintBtn" Margin="0,24,0,0" Padding="0,12"
                             HorizontalAlignment="Stretch"
@@ -79,15 +120,36 @@
 
             <TextBlock Grid.Row="0" Style="{StaticResource SubtitleText}" Text="实时预览" Margin="0,0,0,12" />
 
-            <Border Grid.Row="1"
-                    Background="White"
-                    BorderBrush="{DynamicResource ControlStrokeBrush}"
-                    BorderThickness="1"
-                    CornerRadius="4"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Top">
-                <Image x:Name="PreviewImage" Stretch="None" />
-            </Border>
+            <!-- 纸张模拟预览：纸条宽度固定 384px（对应打印宽度 384 点 = 48mm），
+                 图片等比放在纸上，长图可滚动查看 -->
+            <ScrollViewer Grid.Row="1"
+                          HorizontalScrollBarVisibility="Disabled"
+                          VerticalScrollBarVisibility="Auto">
+                <StackPanel HorizontalAlignment="Center" Margin="0,0,0,32">
+                    <Border x:Name="PaperFrame"
+                            MinHeight="200"
+                            Background="White"
+                            BorderBrush="{DynamicResource ControlStrokeBrush}"
+                            BorderThickness="1"
+                            CornerRadius="2"
+                            HorizontalAlignment="Center"
+                            Padding="4">
+                        <Grid>
+                            <Image x:Name="PreviewImage" Stretch="Uniform"
+                                   HorizontalAlignment="Center" />
+                            <TextBlock x:Name="EmptyHint"
+                                       Text="未选择图片"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       Style="{StaticResource CaptionText}" />
+                        </Grid>
+                    </Border>
+                    <TextBlock x:Name="PreviewHint" Margin="0,12,0,0"
+                               HorizontalAlignment="Center"
+                               Style="{StaticResource CaptionText}"
+                               Text="纸条宽度与实际打印宽度一致（48mm）" />
+                </StackPanel>
+            </ScrollViewer>
         </Grid>
     </Grid>
 </UserControl>

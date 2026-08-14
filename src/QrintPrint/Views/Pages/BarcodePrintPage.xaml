@@ -52,6 +52,13 @@
                              Padding="8"
                              TextChanged="CodeContent_TextChanged" />
 
+                    <!-- 文字前缀（仅影响条码下方文字，不影响条码图形） -->
+                    <TextBlock Style="{StaticResource CaptionText}" Text="文字前缀（可选）" Margin="0,12,0,4" />
+                    <TextBox x:Name="HriPrefixBox" FontSize="14" Padding="8"
+                             TextChanged="HriPrefixBox_TextChanged" />
+                    <TextBlock Margin="0,4,0,0" Style="{StaticResource CaptionText}"
+                               Text="显示在条码下方的文字前，如“SN:”，条码图形不受影响" />
+
                     <!-- 校验提示 -->
                     <TextBlock x:Name="ValidationError" Margin="0,4,0,0"
                                Style="{StaticResource CaptionText}"

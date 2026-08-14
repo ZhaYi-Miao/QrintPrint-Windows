@@ -36,6 +36,7 @@ public partial class MainWindow : Window
         // 按上次设置启动远程打印服务
         ApiPrefs.Load();
         VirtualPrinterPrefs.Load();
+        AppPrefs.Load();
         StartApiServer();
 
         // 虚拟打印机曾启用（TCP 模式）→ 恢复接收服务，保持其他软件可继续打印

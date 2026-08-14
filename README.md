@@ -108,6 +108,11 @@ print/
 
 ZhaYi & DeepSeek
 
+## 相关仓库
+
+- 网页打印控制台（浏览器远程打印面板）：[QrintPrint-Web-Console](https://github.com/ZhaYi-Miao/QrintPrint-Web-Console)
+- HTTP API 接口文档见本仓库 `API.md`
+
 ## License
 
 GPL-v3.0
