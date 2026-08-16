@@ -1,0 +1,52 @@
+<Window x:Class="QrintPrint.Views.UpdateDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="发现新版本"
+        Width="480" Height="440"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize"
+        MinWidth="380" MinHeight="320"
+        ShowInTaskbar="False">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- 标题区 -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,12">
+            <TextBlock x:Name="VersionText" FontSize="18" FontWeight="SemiBold" Text="发现新版本" />
+            <TextBlock x:Name="CurrentText" Margin="0,4,0,0"
+                       Style="{StaticResource CaptionText}" Text="" />
+        </StackPanel>
+
+        <!-- 更新日志 -->
+        <Border Grid.Row="1"
+                Background="{DynamicResource Layer02Brush}"
+                BorderBrush="{DynamicResource ControlStrokeBrush}"
+                BorderThickness="1" CornerRadius="4" Padding="12">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <TextBlock x:Name="BodyText" TextWrapping="Wrap"
+                           Style="{StaticResource BodyText}"
+                           FontFamily="{StaticResource ContentFontFamily}" />
+            </ScrollViewer>
+        </Border>
+
+        <!-- 下载进度 -->
+        <ProgressBar x:Name="ProgressBar" Grid.Row="2" Height="6" Margin="0,12,0,0"
+                     Visibility="Collapsed" Maximum="100" />
+        <TextBlock x:Name="ProgressText" Grid.Row="2" Margin="0,2,0,0"
+                   VerticalAlignment="Bottom"
+                   Style="{StaticResource CaptionText}" Text="" Visibility="Collapsed" />
+
+        <!-- 按钮 -->
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button x:Name="DownloadBtn" Content="下载" Padding="18,8"
+                    Click="DownloadBtn_Click" />
+            <Button x:Name="LaterBtn" Content="稍后再说" Padding="18,8" Margin="10,0,0,0"
+                    Click="LaterBtn_Click" IsCancel="True" />
+        </StackPanel>
+    </Grid>
+</Window>

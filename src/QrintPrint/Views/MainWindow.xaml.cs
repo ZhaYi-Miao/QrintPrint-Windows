@@ -42,6 +42,33 @@ public partial class MainWindow : Window
         // 虚拟打印机曾启用（TCP 模式）→ 恢复接收服务，保持其他软件可继续打印
         if (VirtualPrinterPrefs.Enabled && VirtualPrinterManager.IsTcpMode)
             VirtualPrinterReceiver.StartListener();
+
+        // 启动自动检查更新（设置里勾选后生效；发现新版本弹窗展示详情，失败静默不打扰）
+        if (AppPrefs.AutoCheckUpdate)
+        {
+            _ = CheckForUpdateOnStartupAsync();
+        }
+    }
+
+    /// <summary>启动时检查 GitHub 新版本，发现更新弹出详情对话框</summary>
+    private async Task CheckForUpdateOnStartupAsync()
+    {
+        try
+        {
+            var info = await UpdateChecker.FetchAsync(useSystemProxy: true);
+            if (info.IsNewer)
+            {
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    var dlg = new UpdateDialog(info, useProxy: true) { Owner = this };
+                    dlg.ShowDialog();
+                });
+            }
+        }
+        catch
+        {
+            // 启动检查失败静默（网络原因），用户可在设置页手动检查
+        }
     }
 
     private void NavList_SelectionChanged(object sender, SelectionChangedEventArgs e)

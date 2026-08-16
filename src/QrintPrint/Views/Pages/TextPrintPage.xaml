@@ -102,6 +102,14 @@
                                    Style="{StaticResource BodyText}" Text="8" />
                     </StackPanel>
 
+                    <!-- 文字增强（浓度指令不生效的机器，靠它提清晰度） -->
+                    <TextBlock Style="{StaticResource CaptionText}" Text="文字增强" Margin="0,16,0,4" />
+                    <ComboBox x:Name="EnhanceCombo"
+                              SelectionChanged="EnhanceCombo_SelectionChanged" />
+                    <TextBlock x:Name="EnhanceHint" Margin="0,4,0,0"
+                               Style="{StaticResource CaptionText}"
+                               Text="原始渲染，不做增强" />
+
                     <!-- 打印按钮 -->
                     <Button x:Name="PrintBtn" Margin="0,24,0,0" Padding="0,12"
                             HorizontalAlignment="Stretch"

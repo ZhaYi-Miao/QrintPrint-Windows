@@ -28,6 +28,9 @@ public partial class TemplatePage : UserControl, IPage
         InitializeComponent();
         Directory.CreateDirectory(TemplateDir);
         LoadTemplates();
+        // MainWindow 复用本页实例（只 new 一次），每次显示时重新加载，
+        // 否则在画布页新保存的模板不会出现在列表里
+        Loaded += (_, _) => LoadTemplates();
     }
 
     private void LoadTemplates()
@@ -57,7 +60,7 @@ public partial class TemplatePage : UserControl, IPage
             }
         }
 
-        TemplateList.ItemsSource = _templates;
+        TemplateList.ItemsSource = _templates.ToList();
     }
 
     private void NewTemplateBtn_Click(object sender, RoutedEventArgs e)

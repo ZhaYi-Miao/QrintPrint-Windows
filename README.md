@@ -108,6 +108,17 @@ print/
 
 ZhaYi & DeepSeek
 
+## 致谢
+
+本项目站在众多开源前辈的肩膀上 —— **没有这些项目，就没有 QrintPrint**。在此向它们致以最诚挚的敬意：
+
+- **[Thisko/QrintPrint](https://github.com/Thisko/QrintPrint)** —— **错题小印开源的先行者与开创者**
+- [lztttt/QrintPrint-Android](https://github.com/lztttt/QrintPrint-Android) —— Android 原生版
+- [snowboys/QrintPrint-Windows](https://github.com/snowboys/QrintPrint-Windows) —— Windows 端参考实现
+- [yiran168/suda-win-web](https://github.com/yiran168/suda-win-web) —— 桌面/网页版「素打」
+
+感谢所有为错题小印生态做出贡献的开源开发者 ❤️
+
 ## 相关仓库
 
 - 网页打印控制台（浏览器远程打印面板）：[QrintPrint-Web-Console](https://github.com/ZhaYi-Miao/QrintPrint-Web-Console)

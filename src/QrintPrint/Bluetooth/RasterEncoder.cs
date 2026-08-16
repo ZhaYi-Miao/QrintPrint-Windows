@@ -258,6 +258,16 @@ public static class RasterEncoder
         public bool Bold { get; set; }
         public bool Italic { get; set; }
         public bool Underline { get; set; }
+
+        /// <summary>OpenType 字重（100 细 ~ 900 黑，400 = 常规）。Bold=true 时强制 ≥600</summary>
+        public int FontWeight { get; set; } = 400;
+
+        /// <summary>行内对齐方式</summary>
+        public TextAlignmentKind Alignment { get; set; } = TextAlignmentKind.LEFT;
+
+        /// <summary>竖排（每字一行，从上到下）</summary>
+        public bool Vertical { get; set; }
+
         /// <summary>字间距,单位:打印点(1 点 = 1/8 mm)</summary>
         public int LetterSpacing { get; set; }
         /// <summary>行间距,叠加在字号之上</summary>
@@ -277,25 +287,42 @@ public static class RasterEncoder
         Margin = 8,
     };
 
-    private static FontWeight ResolveFontWeight(bool bold) => bold ? FontWeights.SemiBold : FontWeights.Normal;
+    private static FontWeight ResolveFontWeight(bool bold, int weight)
+    {
+        // OpenType 字重 → WPF FontWeight：加粗勾选时至少 SemiBold，未勾选用用户字重（400 常规）
+        int w = bold ? Math.Max(600, weight) : weight;
+        return w switch
+        {
+            <= 100 => FontWeights.Thin,
+            <= 200 => FontWeights.ExtraLight,
+            <= 300 => FontWeights.Light,
+            <= 400 => FontWeights.Normal,
+            <= 500 => FontWeights.Medium,
+            <= 600 => FontWeights.SemiBold,
+            <= 700 => FontWeights.Bold,
+            <= 800 => FontWeights.ExtraBold,
+            _ => FontWeights.Black,
+        };
+    }
+
     private static FontStyle ResolveFontStyle(bool italic) => italic ? FontStyles.Italic : FontStyles.Normal;
 
     /// <summary>
     /// 公开的单行文本宽度测量(含字间距),用于富文本拼接时精确换行。
     /// </summary>
     public static double MeasureTextWidth(string text, TextRenderOptions options) =>
-        MeasureTextWidth(text, options.FontFamily, options.FontSize, options.Bold, options.Italic)
+        MeasureTextWidth(text, options.FontFamily, options.FontSize, options.Bold, options.Italic, options.FontWeight)
         + text.Length * options.LetterSpacing;
 
     /// <summary>
     /// 用 FormattedText 量出单行文本在指定字号下的像素宽度。
     /// </summary>
-    private static double MeasureTextWidth(string text, string fontFamily, double fontSize, bool bold, bool italic)
+    private static double MeasureTextWidth(string text, string fontFamily, double fontSize, bool bold, bool italic, int weight)
     {
         var typeface = new Typeface(
             string.IsNullOrEmpty(fontFamily) ? SystemFonts.MessageFontFamily : new FontFamily(fontFamily),
             ResolveFontStyle(italic),
-            ResolveFontWeight(bold),
+            ResolveFontWeight(bold, weight),
             FontStretches.Normal);
 
         var formatted = new FormattedText(
@@ -314,7 +341,7 @@ public static class RasterEncoder
     /// 按可用宽度逐字符折行。中文没有词边界,只能按字符量宽度。
     /// </summary>
     private static List<string> WrapText(string text, string fontFamily, double fontSize,
-        bool bold, bool italic, int letterSpacing, double usable)
+        bool bold, bool italic, int weight, int letterSpacing, double usable)
     {
         var lines = new List<string>();
         string[] paragraphs = text.Split('\n');
@@ -329,7 +356,7 @@ public static class RasterEncoder
             foreach (char ch in paragraph)
             {
                 string candidate = current.ToString() + ch;
-                double w = MeasureTextWidth(candidate, fontFamily, fontSize, bold, italic) +
+                double w = MeasureTextWidth(candidate, fontFamily, fontSize, bold, italic, weight) +
                            candidate.Length * letterSpacing;
                 if (w <= usable)
                 {
@@ -356,19 +383,38 @@ public static class RasterEncoder
     {
         int width = Math.Max(1 + 2 * options.Margin, maxWidth);
         double usable = width - 2 * options.Margin;
+
+        if (options.Vertical)
+        {
+            // 竖排：内容宽度 = 单字宽 + 边距，高度按字数走
+            int charCount = CountPrintableChars(text);
+            double charW = options.FontSize + options.LetterSpacing;
+            return Math.Max((int)options.FontSize, (int)Math.Ceiling(charW)) + 2 * options.Margin;
+        }
+
         var lines = WrapText(text, options.FontFamily, options.FontSize,
-            options.Bold, options.Italic, options.LetterSpacing, usable);
+            options.Bold, options.Italic, options.FontWeight, options.LetterSpacing, usable);
 
         double widest = 0;
         foreach (string line in lines)
         {
             double w = MeasureTextWidth(line, options.FontFamily, options.FontSize,
-                options.Bold, options.Italic) + line.Length * options.LetterSpacing;
+                options.Bold, options.Italic, options.FontWeight) + line.Length * options.LetterSpacing;
             if (w > widest) widest = w;
         }
         // 至少留一个字的可画空间,避免内容再宽也被 clamp 死
         int content = Math.Max((int)options.FontSize, (int)Math.Ceiling(widest));
         return Math.Min(width, content + 2 * options.Margin);
+    }
+
+    private static int CountPrintableChars(string text)
+    {
+        int n = 0;
+        foreach (char c in text)
+        {
+            if (c != '\n' && c != '\r') n++;
+        }
+        return n;
     }
 
     /// <summary>
@@ -381,20 +427,19 @@ public static class RasterEncoder
     /// <summary>
     /// 同上,但可指定排版宽度。
     /// boxWidth 是**元素的总宽**,margin 在它内部再往里收。
+    /// 支持：OpenType 字重 / 行内左中右对齐 / 竖排（每字一行）。
     /// </summary>
     public static Image<Rgba32> RenderTextToImageIn(string text, TextRenderOptions options, int boxWidth)
     {
         // 至少留一列可画,否则 measureText 会在负宽度上死循环折行
         int width = Math.Max(1 + 2 * options.Margin, boxWidth);
         double usable = width - 2 * options.Margin;
-        var lines = WrapText(text, options.FontFamily, options.FontSize,
-            options.Bold, options.Italic, options.LetterSpacing, usable);
 
         // 创建 Typeface 用于测量实际行高
         var typeface = new Typeface(
             string.IsNullOrEmpty(options.FontFamily) ? SystemFonts.MessageFontFamily : new FontFamily(options.FontFamily),
             ResolveFontStyle(options.Italic),
-            ResolveFontWeight(options.Bold),
+            ResolveFontWeight(options.Bold, options.FontWeight),
             FontStretches.Normal);
 
         // 用 FormattedText.Height 获取实际行高(含 descent + 行间距),
@@ -412,6 +457,24 @@ public static class RasterEncoder
             actualLineHeight = Math.Ceiling(measure.Height) + options.LineSpacing;
         }
         int lineHeight = (int)actualLineHeight;
+
+        // 竖排：每个字符独占一行（含空格占位），忽略折行
+        List<string> lines;
+        if (options.Vertical)
+        {
+            lines = new List<string>();
+            foreach (char c in text)
+            {
+                if (c == '\r') continue;
+                if (c == '\n') continue;
+                lines.Add(c.ToString());
+            }
+        }
+        else
+        {
+            lines = WrapText(text, options.FontFamily, options.FontSize,
+                options.Bold, options.Italic, options.FontWeight, options.LetterSpacing, usable);
+        }
 
         // 下划线粗细随字号缩放,固定 1px 在大字号下会细得几乎打不出来
         int underlineWeight = Math.Max(1, (int)Math.Round(options.FontSize / 14));
@@ -435,6 +498,15 @@ public static class RasterEncoder
                 double y = options.Margin + i * lineHeight;
                 string line = lines[i];
                 double x = options.Margin;
+
+                // 行内对齐：先量出行宽再定起始 x
+                if (options.Alignment != TextAlignmentKind.LEFT)
+                {
+                    double lineW = MeasureTextWidth(line, options.FontFamily, options.FontSize,
+                        options.Bold, options.Italic, options.FontWeight) + line.Length * options.LetterSpacing;
+                    if (options.Alignment == TextAlignmentKind.CENTER) x = options.Margin + (usable - lineW) / 2;
+                    else x = options.Margin + Math.Max(0, usable - lineW); // RIGHT
+                }
 
                 // 逐字绘制,每个字之间加上 LetterSpacing
                 foreach (char ch in line)
@@ -486,3 +558,6 @@ public static class RasterEncoder
         return img;
     }
 }
+
+/// <summary>文本行内对齐方式</summary>
+public enum TextAlignmentKind { LEFT, CENTER, RIGHT }

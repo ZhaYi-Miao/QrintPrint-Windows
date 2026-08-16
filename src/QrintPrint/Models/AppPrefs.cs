@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using QrintPrint.Bluetooth;
 
 namespace QrintPrint.Models;
 
@@ -16,6 +17,15 @@ public static class AppPrefs
     /// </summary>
     public static int PaperWidthMm { get; set; } = 50;
 
+    /// <summary>
+    /// 文字增强算法（打印清晰度补偿）。浓度指令不生效的机器靠它提清晰度。
+    /// 文本打印页选择后会持久化；虚拟打印机 / API 文本打印默认用它。
+    /// </summary>
+    public static TextEnhanceMode TextEnhanceSetting { get; set; } = TextEnhanceMode.NONE;
+
+    /// <summary>程序启动时自动检查 GitHub 是否有新版本</summary>
+    public static bool AutoCheckUpdate { get; set; }
+
     /// <summary>加载配置，文件不存在或损坏时回退默认值</summary>
     public static void Load()
     {
@@ -30,7 +40,17 @@ public static class AppPrefs
                     && pw.ValueKind == JsonValueKind.Number)
                 {
                     int v = pw.GetInt32();
-                    if (v is 50 or 57) PaperWidthMm = v;
+                    if (v >= 50 && v <= 57) PaperWidthMm = v;
+                }
+                if (root.TryGetProperty("textEnhance", out var te)
+                    && te.ValueKind == JsonValueKind.String)
+                {
+                    TextEnhanceSetting = TextEnhance.Parse(te.GetString());
+                }
+                if (root.TryGetProperty("autoCheckUpdate", out var acu)
+                    && acu.ValueKind == JsonValueKind.True)
+                {
+                    AutoCheckUpdate = true;
                 }
             }
         }
@@ -45,7 +65,12 @@ public static class AppPrefs
     {
         try
         {
-            var payload = new { paperWidthMm = PaperWidthMm };
+            var payload = new
+            {
+                paperWidthMm = PaperWidthMm,
+                textEnhance = TextEnhance.Name(TextEnhanceSetting),
+                autoCheckUpdate = AutoCheckUpdate,
+            };
             File.WriteAllText(GetPath(), JsonSerializer.Serialize(payload));
         }
         catch

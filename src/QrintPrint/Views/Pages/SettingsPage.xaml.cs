@@ -36,6 +36,8 @@ public partial class SettingsPage : UserControl, IPage
     {
         InitializeComponent();
         Loaded += (_, _) => RefreshDeviceInfo();
+        // 页面显示时同步自动检查开关（AppPrefs 在 MainWindow 构造体里才 Load，字段初始化时还没读到）
+        Loaded += (_, _) => AutoCheckUpdateCheck.IsChecked = AppPrefs.AutoCheckUpdate;
         PrinterConnection.Instance.Status.PropertyChanged += (_, _) => Dispatcher.BeginInvoke(RefreshDeviceInfo);
 
         // 加载保存的设置
@@ -489,5 +491,113 @@ public partial class SettingsPage : UserControl, IPage
             // 打不开浏览器时忽略
         }
         e.Handled = true;
+    }
+
+    // ── 检查更新 / 下载（网络逻辑在 UpdateChecker，本页负责 UI） ──
+
+    private UpdateInfo? _latestInfo;
+    private bool _updatingDownloading;
+
+    private void AutoCheckUpdateCheck_Changed(object sender, RoutedEventArgs e)
+    {
+        AppPrefs.AutoCheckUpdate = AutoCheckUpdateCheck.IsChecked == true;
+        AppPrefs.Save();
+    }
+
+    /// <summary>解析 "v1.2.3" → (1,2,3)。失败返回 null</summary>
+    private static (int Maj, int Min, int Pat)? ParseVersion(string? tag)
+    {
+        if (string.IsNullOrEmpty(tag)) return null;
+        string v = tag.TrimStart('v', 'V');
+        var parts = v.Split('.');
+        if (parts.Length < 2) return null;
+        if (!int.TryParse(parts[0], out int maj) || !int.TryParse(parts[1], out int min)) return null;
+        int pat = parts.Length > 2 && int.TryParse(parts[2], out int p) ? p : 0;
+        return (maj, min, pat);
+    }
+
+    private async void CheckUpdateBtn_Click(object sender, RoutedEventArgs e)
+    {
+        CheckUpdateBtn.IsEnabled = false;
+        DownloadUpdateBtn.Visibility = Visibility.Collapsed;
+        UpdateStatusText.Text = "正在检查更新...";
+        try
+        {
+            var info = await UpdateChecker.FetchAsync(UseProxyCheck.IsChecked == true);
+            _latestInfo = info;
+            if (info.IsNewer)
+            {
+                string text = $"发现新版本 {info.Tag}（当前 {UpdateChecker.CurrentVersionText}）\n{UpdateChecker.Truncate(info.Body, 300)}";
+                if (string.IsNullOrEmpty(info.ExeUrl))
+                {
+                    text += "\n（GitHub 无正式发布版本，请到 Releases 页面手动下载）";
+                }
+                UpdateStatusText.Text = text;
+                DownloadUpdateBtn.Visibility = string.IsNullOrEmpty(info.ExeUrl)
+                    ? Visibility.Collapsed
+                    : Visibility.Visible;
+            }
+            else if (string.IsNullOrEmpty(info.Tag))
+            {
+                UpdateStatusText.Text = "未获取到版本信息（仓库可能没有发布任何版本）";
+            }
+            else
+            {
+                UpdateStatusText.Text = $"已是最新版本（{UpdateChecker.CurrentVersionText}）";
+            }
+        }
+        catch (Exception ex)
+        {
+            string hint = ex is System.Net.Http.HttpRequestException { StatusCode: System.Net.HttpStatusCode.Forbidden }
+                ? "（403：GitHub API 可能限流或网络受限，请确认已勾选“使用系统代理”，或在系统里开启代理工具后重试）"
+                : "。请确认网络能访问 GitHub（国内网络可能需要代理）";
+            UpdateStatusText.Text = $"检查更新失败：{ex.Message}{hint}";
+        }
+        finally
+        {
+            CheckUpdateBtn.IsEnabled = true;
+        }
+    }
+
+    /// <summary>程序内下载最新版 exe 到「下载」文件夹（带进度条）</summary>
+    private async void DownloadUpdateBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (_updatingDownloading || _latestInfo is null) return;
+        _updatingDownloading = true;
+        DownloadUpdateBtn.IsEnabled = false;
+        UpdateProgress.Visibility = Visibility.Visible;
+        UpdateProgress.Value = 0;
+        try
+        {
+            var progress = new Progress<double>(v =>
+            {
+                UpdateProgress.Value = v;
+                UpdateStatusText.Text = $"正在下载... {v:F0}%";
+            });
+            string savePath = await UpdateChecker.DownloadAsync(
+                _latestInfo, UseProxyCheck.IsChecked == true, progress);
+
+            UpdateProgress.Visibility = Visibility.Collapsed;
+            UpdateStatusText.Text = $"下载完成：{savePath}";
+            var result = MessageBox.Show($"已下载到：\n{savePath}\n\n是否立即打开该文件？", "下载完成",
+                MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (result == MessageBoxResult.Yes)
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = savePath,
+                    UseShellExecute = true,
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            UpdateStatusText.Text = $"下载失败：{ex.Message}";
+        }
+        finally
+        {
+            _updatingDownloading = false;
+            DownloadUpdateBtn.IsEnabled = true;
+        }
     }
 }

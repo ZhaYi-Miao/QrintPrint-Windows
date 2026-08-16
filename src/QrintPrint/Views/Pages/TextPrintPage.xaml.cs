@@ -23,8 +23,49 @@ public partial class TextPrintPage : UserControl, IPage
     public TextPrintPage()
     {
         InitializeComponent();
+        InitEnhanceCombo();
         TextContent.TextChanged += TextContent_TextChanged;
         UpdatePreview();
+    }
+
+    /// <summary>初始化文字增强下拉框（选项来自 TextEnhance.Options，默认取全局设置）</summary>
+    private void InitEnhanceCombo()
+    {
+        foreach (var (mode, label, hint) in TextEnhance.Options)
+        {
+            EnhanceCombo.Items.Add(new ComboBoxItem { Content = label, Tag = mode });
+        }
+        // 选中项会触发 SelectionChanged → 更新提示 + 预览
+        EnhanceCombo.SelectedIndex = FindEnhanceIndex(AppPrefs.TextEnhanceSetting);
+    }
+
+    private static int FindEnhanceIndex(TextEnhanceMode mode)
+    {
+        for (int i = 0; i < TextEnhance.Options.Length; i++)
+        {
+            if (TextEnhance.Options[i].Mode == mode) return i;
+        }
+        return 0;
+    }
+
+    private void EnhanceCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (EnhanceHint is null) return;
+        var mode = SelectedEnhanceMode();
+        string hint = TextEnhance.Options[FindEnhanceIndex(mode)].Hint;
+        EnhanceHint.Text = hint;
+        // 持久化为全局默认（虚拟打印机 / API 文本打印共用）
+        AppPrefs.TextEnhanceSetting = mode;
+        AppPrefs.Save();
+        UpdatePreview();
+    }
+
+    /// <summary>当前选中的增强模式</summary>
+    private TextEnhanceMode SelectedEnhanceMode()
+    {
+        return EnhanceCombo.SelectedItem is ComboBoxItem { Tag: TextEnhanceMode mode }
+            ? mode
+            : TextEnhanceMode.NONE;
     }
 
     private void BackBtn_Click(object sender, RoutedEventArgs e)
@@ -159,6 +200,12 @@ public partial class TextPrintPage : UserControl, IPage
                 };
                 using var img = RasterEncoder.RenderTextToImageIn(seg.Text, localOpts, maxWidth);
                 var gray = RasterEncoder.ImageToGrayRaw(img);
+                // 文字增强：浓度指令不生效的机器靠软件端二值化前补偿清晰度
+                var enhance = SelectedEnhanceMode();
+                if (enhance != TextEnhanceMode.NONE)
+                {
+                    gray = TextEnhance.Apply(gray, enhance);
+                }
                 var binary = Dither.DitherToBinary(gray, DitherMode.NONE, RasterEncoder.THRESHOLD_TEXT);
                 rendered.Add((binary, gray.Width, gray.Height));
                 totalH += img.Height + textOptions.LineSpacing;

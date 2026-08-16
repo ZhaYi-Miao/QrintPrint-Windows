@@ -61,6 +61,23 @@ public sealed class PrinterConnection : IDisposable
     /// <summary>滚动接收缓冲上限,防止长时间不读导致无限增长</summary>
     private const int RX_BUFFER_MAX = 4096;
 
+    // ── 过热行级断点续打参数（移植自 suda-win-web src/print/printJob.ts）──
+
+    /// <summary>同一份因过热保护被固件停机后允许的最大中断续打次数（断点行单调前进，防死循环）</summary>
+    private const int MAX_HEAT_PAUSES = 6;
+
+    /// <summary>过热散热等待上限：打印头自然散热通常 30–120s</summary>
+    private const int COOLDOWN_TIMEOUT_MS = 180000;
+
+    /// <summary>SPP 115200bps ≈ 11.5 KB/s，用于估算点阵传输耗时</summary>
+    private const int SPP_BYTES_PER_SEC = 11520;
+
+    /// <summary>无标定数据时的保守打印速度（≈31mm/s，偏慢取值使断点估算偏小、重叠偏多）</summary>
+    private const int FALLBACK_ROWS_PER_SEC = 250;
+
+    /// <summary>过热断点回退重叠行数（≈16mm）</summary>
+    private const int HEAT_OVERLAP_ROWS = 128;
+
     private static PrinterConnection? s_instance;
 
     public static PrinterConnection Instance => s_instance ??= new PrinterConnection();
@@ -435,19 +452,24 @@ public sealed class PrinterConnection : IDisposable
     // ── 底层收发 ──────────────────────────────────────────────
 
     /// <summary>按 SDK 的方式分包:每 1024 字节一包,包间 1ms</summary>
-    private async Task<bool> SendAsync(byte[] data)
+    private Task<bool> SendAsync(byte[] data) => SendAsync(data, 0);
+
+    /// <summary>
+    /// 按 SDK 的方式分包发送,从指定偏移开始（过热续打时只发剩余行,避免整份重发）。
+    /// </summary>
+    private async Task<bool> SendAsync(byte[] data, int offset)
     {
         var stream = _stream;
         if (stream is null) return false;
 
         int total = data.Length;
-        for (int offset = 0; offset < total; offset += QringProtocol.CHUNK_SIZE)
+        for (int off = offset; off < total; off += QringProtocol.CHUNK_SIZE)
         {
-            int end = Math.Min(offset + QringProtocol.CHUNK_SIZE, total);
-            int len = end - offset;
+            int end = Math.Min(off + QringProtocol.CHUNK_SIZE, total);
+            int len = end - off;
             try
             {
-                await stream.WriteAsync(data.AsMemory(offset, len));
+                await stream.WriteAsync(data.AsMemory(off, len));
                 await stream.FlushAsync();
             }
             catch (Exception ex)
@@ -677,32 +699,10 @@ public sealed class PrinterConnection : IDisposable
             }
 
             // 蓝牙 / WinUSB 模式: 支持双向通信，可以等 ACK
-            if (!await SendAllAsync(new[] { QringProtocol.CMD_ENABLE, QringProtocol.CMD_ENABLE2 }))
-            {
-                return new PrintResult(false, "发送失败,连接可能已断开");
-            }
-            if (thickness is { } t)
-            {
-                await SendAsync(QringProtocol.CmdThickness(t));
-            }
-            await SendAsync(QringProtocol.CMD_WAKEUP);
-            await SendAllAsync(QringProtocol.CmdFeed(FEED_BEFORE));
-            await SendAsync(QringProtocol.CmdRasterHeader(raster.WidthBytes, raster.Height, 0));
-            if (!await SendAsync(raster.Data))
-            {
-                return new PrintResult(false, "位图发送中断");
-            }
-            await SendAllAsync(QringProtocol.CmdFeed(FEED_AFTER));
-            await SendAsync(QringProtocol.CMD_STOP);
-
+            // 走【过热行级断点续打】：打印途中过热停机不整份判失败，而是估算已打行数、
+            // 回退重叠行后从断点继续打剩余部分（USB 单向通道无法等 ACK/查状态，不支持续打）
             _status.Printing = true;
-            var result = await WaitAckAsync(ACK_TIMEOUT_MS);
-            if (!result.Ok)
-            {
-                _status.LastError = result.Message;
-            }
-            AppLog.Write("PRINT", result.Ok ? "打印完成 (蓝牙, ACK 确认)" : $"打印失败: {result.Message}");
-            return result;
+            return await PrintRasterBluetoothResumableAsync(raster, thickness);
         }
         finally
         {
@@ -712,6 +712,152 @@ public sealed class PrinterConnection : IDisposable
             await RefreshAllAsync();
             if (_foreground && IsAlive()) StartPolling();
         }
+    }
+
+    /// <summary>
+    /// 蓝牙打印（支持过热行级断点续打）。
+    ///
+    /// 热敏头整行同时加热（行是原子单位，不存在「行内半行」），固件不回报已打行号，
+    /// 只能估算：已打行数 ≈ (故障时刻 − 开始发送 − 传输耗时) × 打印速度。
+    /// 传输耗时按 SPP 115200bps≈11.5KB/s 估算；打印速度首次整份成功时实测标定，
+    /// 无标定用保守值（偏慢取值使断点估算偏小、重叠偏多）。
+    /// 估算后回退 HEAT_OVERLAP_ROWS 行重叠重打 —— 宁可接缝处略加深，也不让内容缺半行。
+    /// 续打次数有上限（断点行单调前进），防固件反复过热时死循环。
+    /// </summary>
+    private async Task<PrintResult> PrintRasterBluetoothResumableAsync(RasterData raster, byte? thickness)
+    {
+        int rowOffset = 0;
+        int heatPauses = 0;
+        double measuredSpeed = 0; // 本机实测打印速度（行/秒），整份一次打成后标定
+
+        for (;;)
+        {
+            if (!IsAlive()) return new PrintResult(false, "打印机未连接");
+
+            // 每段重发握手：唤醒 + 使能（+ 浓度，若调用方指定），续打与首打同套路
+            if (!await SendAllAsync(new[] { QringProtocol.CMD_ENABLE, QringProtocol.CMD_ENABLE2 }))
+            {
+                return new PrintResult(false, "发送失败,连接可能已断开");
+            }
+            if (thickness is { } t)
+            {
+                await SendAsync(QringProtocol.CmdThickness(t));
+            }
+            await SendAsync(QringProtocol.CMD_WAKEUP);
+            if (rowOffset == 0)
+            {
+                // 只有首段走纸；续打不走纸，防止接缝错位
+                await SendAllAsync(QringProtocol.CmdFeed(FEED_BEFORE));
+            }
+
+            int rows = raster.Height - rowOffset;
+            int byteOffset = rowOffset * raster.WidthBytes;
+            await SendAsync(QringProtocol.CmdRasterHeader(raster.WidthBytes, rows, 0));
+
+            var tStart = DateTime.UtcNow;
+            if (!await SendAsync(raster.Data, byteOffset))
+            {
+                return new PrintResult(false, "位图发送中断");
+            }
+            var tSent = DateTime.UtcNow;
+            await SendAsync(QringProtocol.CMD_STOP);
+
+            var result = await WaitAckAsync(ACK_TIMEOUT_MS);
+            if (result.Ok)
+            {
+                if (rowOffset == 0)
+                {
+                    // 整份一次打成：标定本机真实打印速度，供后续过热断点估算
+                    double sec = (DateTime.UtcNow - tSent).TotalSeconds;
+                    if (sec > 0.5) measuredSpeed = raster.Height / sec;
+                }
+                break;
+            }
+
+            // 过热判定：主动故障帧（FF 03），或 ACK 超时后状态位过热（不上报帧的固件）
+            bool overheated = result.Message == "过热"
+                || (result.Message == "等待打印完成超时" && await IsOverheatedAsync());
+            if (!overheated)
+            {
+                _status.LastError = result.Message;
+                AppLog.Write("PRINT", $"打印失败: {result.Message}");
+                return result;
+            }
+
+            heatPauses++;
+            if (heatPauses > MAX_HEAT_PAUSES)
+            {
+                var msg = $"打印头过热保护反复触发：同一份续打 {MAX_HEAT_PAUSES} 次仍被固件停机。请关机散热几分钟后再试，或缩短打印内容";
+                _status.LastError = msg;
+                AppLog.Write("PRINT", msg);
+                return new PrintResult(false, msg);
+            }
+
+            // 估算已打行数并回退重叠行，散热后从断点续打。
+            // 两个不可测误差（固件缓冲积压、边传边打）都只会让估算偏小，
+            // 再回退重叠行重打——宁可接缝处略加深，也不让内容缺半行。
+            double transferSec = (raster.Data.Length - byteOffset) / (double)SPP_BYTES_PER_SEC;
+            double printSec = Math.Max(0, (DateTime.UtcNow - tStart).TotalSeconds - transferSec);
+            double speed = measuredSpeed > 0 ? measuredSpeed : FALLBACK_ROWS_PER_SEC;
+            int estRows = (int)(printSec * speed);
+            int advance = Math.Max(0, estRows - HEAT_OVERLAP_ROWS);
+            rowOffset = Math.Min(raster.Height - 1, rowOffset + advance);
+
+            AppLog.Write("PRINT",
+                $"🌡️ 打印头过热，固件保护停机：估计已打 {rowOffset}/{raster.Height} 行，散热后从断点续打（回退重叠 {HEAT_OVERLAP_ROWS} 行，第 {heatPauses}/{MAX_HEAT_PAUSES} 次）");
+            await WaitCoolDownAsync();
+        }
+
+        // 全部行打完后再走纸
+        await SendAllAsync(QringProtocol.CmdFeed(FEED_AFTER));
+        AppLog.Write("PRINT", "打印完成 (蓝牙, ACK 确认)");
+        return new PrintResult(true, "打印完成");
+    }
+
+    /// <summary>查询当前是否过热（状态位 0x10）。查询失败按不过热处理</summary>
+    private async Task<bool> IsOverheatedAsync()
+    {
+        var status = await QueryStatusAsync();
+        return status is { } s && s.Overheat;
+    }
+
+    /// <summary>
+    /// 过热故障帧后的散热等待：轮询状态直到过热位（0x10）清除。
+    /// 收到过热帧是确定事实——状态通道不通时不能空等放行，退化为固定盲等 20s 保守散热。
+    /// </summary>
+    private async Task WaitCoolDownAsync()
+    {
+        var deadline = DateTime.UtcNow.AddMilliseconds(COOLDOWN_TIMEOUT_MS);
+        int silentPolls = 0;
+        bool sawHeat = false;
+        while (DateTime.UtcNow < deadline)
+        {
+            if (!IsAlive()) return; // 连接断开：交给上层失败处理
+
+            var status = await QueryStatusAsync();
+            if (status is null)
+            {
+                silentPolls++;
+                if (silentPolls >= 2)
+                {
+                    AppLog.Write("PRINT", "状态通道不通，无法观察热位——盲等 20s 散热后续打");
+                    await Task.Delay(20000);
+                    return;
+                }
+            }
+            else
+            {
+                silentPolls = 0;
+                if (!status.Value.Overheat)
+                {
+                    if (sawHeat) AppLog.Write("PRINT", "散热完成，继续打印");
+                    return;
+                }
+                sawHeat = true;
+            }
+            await Task.Delay(2000); // 散热是分钟级过程，轮询不必密
+        }
+        AppLog.Write("PRINT", "等待散热超时，尝试继续打印（若仍过热固件会再次保护）");
     }
 
     /// <summary>

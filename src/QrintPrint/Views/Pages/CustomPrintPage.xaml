@@ -1,6 +1,7 @@
 <UserControl x:Class="QrintPrint.Views.Pages.CustomPrintPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             PreviewKeyDown="Root_PreviewKeyDown">
     <UserControl.Resources>
         <!-- 细滚动条样式 -->
         <Style x:Key="ThinScrollBar" TargetType="ScrollBar">
@@ -39,153 +40,457 @@
             </Setter>
         </Style>
     </UserControl.Resources>
-    <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="320" />
-            <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
 
-        <!-- ═══ 左侧设置面板 ═══ -->
-        <Border Grid.Column="0"
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- ═══ 第一行：全局操作与打印设置栏 ═══ -->
+        <Border Grid.Row="0"
                 Background="{DynamicResource Layer02Brush}"
                 BorderBrush="{DynamicResource ControlStrokeBrush}"
-                BorderThickness="0,0,1,0"
-                Padding="16">
-            <ScrollViewer VerticalScrollBarVisibility="Auto"
-                          Style="{StaticResource ThinScrollViewer}">
-                <StackPanel>
-                    <!-- 返回按钮 -->
-                    <Button Margin="0,0,0,12" Padding="8,6"
-                            HorizontalAlignment="Left"
-                            Click="BackBtn_Click"
-                            Content="← 返回首页" />
+                BorderThickness="0,0,0,1"
+                Padding="12,6">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
 
-                    <TextBlock Style="{StaticResource SubtitleText}" Text="自定义打印" Margin="0,0,0,16" />
-
-                    <!-- 添加元素 -->
-                    <TextBlock Style="{StaticResource CaptionText}" Text="添加元素" Margin="0,0,0,4" />
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                        <Button x:Name="AddTextBtn" Padding="12,8" Margin="0,0,8,0"
-                                Click="AddTextBtn_Click" Content="+ 文字" />
-                        <Button x:Name="AddImageBtn" Padding="12,8" Margin="0,0,8,0"
-                                Click="AddImageBtn_Click" Content="+ 图片" />
-                        <Button x:Name="AddCodeBtn" Padding="12,8" Margin="0,0,8,0"
-                                Click="AddCodeBtn_Click" Content="+ 条码" />
-                        <Button x:Name="AddFormulaBtn" Padding="12,8"
-                                Click="AddFormulaBtn_Click" Content="+ 公式" />
-                    </StackPanel>
-
-                    <!-- 元素列表 -->
-                    <TextBlock Style="{StaticResource CaptionText}" Text="元素列表" Margin="0,0,0,4" />
-                    <ListBox x:Name="ElementList" Height="160" Margin="0,0,0,12"
-                             SelectionChanged="ElementList_SelectionChanged">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding DisplayName}" />
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-
-                    <!-- 选中元素属性 -->
-                    <Border x:Name="ElementProps" Visibility="Collapsed"
-                            BorderBrush="{DynamicResource ControlStrokeBrush}"
-                            BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,12">
-                        <StackPanel>
-                            <TextBlock Style="{StaticResource CaptionText}" Text="选中元素属性" Margin="0,0,0,8" />
-
-                            <!-- 位置 -->
-                            <TextBlock Style="{StaticResource CaptionText}" Text="X 位置（点）" Margin="0,0,0,4" />
-                            <TextBox x:Name="PosXInput" Padding="6,4" TextChanged="PosInput_TextChanged" />
-
-                            <TextBlock Style="{StaticResource CaptionText}" Text="Y 位置（点）" Margin="0,8,0,4" />
-                            <TextBox x:Name="PosYInput" Padding="6,4" TextChanged="PosInput_TextChanged" />
-
-                            <!-- 文字元素专属 -->
-                            <StackPanel x:Name="TextProps" Visibility="Collapsed">
-                                <TextBlock Style="{StaticResource CaptionText}" Text="文字内容" Margin="0,12,0,4" />
-                                <TextBox x:Name="ElementText" Height="60" TextWrapping="Wrap"
-                                         AcceptsReturn="True" Padding="6,4"
-                                         TextChanged="ElementText_TextChanged" />
-
-                                <TextBlock Style="{StaticResource CaptionText}" Text="字号" Margin="0,8,0,4" />
-                                <Slider x:Name="ElementFontSize" Minimum="12" Maximum="48" Value="24"
-                                        TickFrequency="1" IsSnapToTickEnabled="True"
-                                        ValueChanged="ElementFontSize_ValueChanged" />
-                            </StackPanel>
-
-                            <!-- 公式元素专属 -->
-                            <StackPanel x:Name="FormulaProps" Visibility="Collapsed">
-                                <TextBlock Style="{StaticResource CaptionText}" Text="LaTeX 公式" Margin="0,12,0,4" />
-                                <TextBox x:Name="ElementFormula" Height="60" TextWrapping="Wrap"
-                                         AcceptsReturn="True" Padding="6,4"
-                                         TextChanged="ElementFormula_TextChanged" />
-                                <TextBlock Style="{StaticResource CaptionText}" Text="示例: \frac{1}{2} 或 E=mc^2" Margin="0,4,0,4" />
-                            </StackPanel>
-
-                            <!-- 操作按钮 -->
-                            <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                                <Button Padding="8,6" Margin="0,0,8,0"
-                                        Click="MoveUpBtn_Click" Content="上移" />
-                                <Button Padding="8,6" Margin="0,0,8,0"
-                                        Click="MoveDownBtn_Click" Content="下移" />
-                                <Button Padding="8,6"
-                                        Click="DeleteBtn_Click" Content="删除" />
-                            </StackPanel>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- 画布最小长度 -->
-                    <TextBlock Style="{StaticResource CaptionText}" Text="最小长度（点）" Margin="0,0,0,4" />
-                    <TextBox x:Name="MinLengthInput" Padding="6,4" Text="200"
-                             TextChanged="MinLengthInput_TextChanged" />
-
-                    <!-- 浓度 -->
-                    <TextBlock Style="{StaticResource CaptionText}" Text="打印浓度" Margin="0,20,0,4" />
-                    <StackPanel Orientation="Horizontal">
-                        <Slider x:Name="ThicknessSlider" Minimum="1" Maximum="5" Value="3"
-                                Width="200" TickFrequency="1" IsSnapToTickEnabled="True"
-                                ValueChanged="ThicknessSlider_ValueChanged" />
-                        <TextBlock x:Name="ThicknessLabel" Margin="8,0,0,0"
-                                   Style="{StaticResource BodyText}" Text="3" />
-                    </StackPanel>
-
-                    <!-- 操作按钮 -->
-                    <Button x:Name="SaveTemplateBtn" Margin="0,20,0,0" Padding="0,10"
-                            HorizontalAlignment="Stretch"
-                            Click="SaveTemplateBtn_Click"
-                            Content="保存为模板" />
-
-                    <!-- 打印按钮 -->
-                    <Button x:Name="PrintBtn" Margin="0,8,0,0" Padding="0,12"
-                            HorizontalAlignment="Stretch"
-                            Click="PrintBtn_Click"
-                            Content="打印" />
+                <!-- 左：返回 + 文件名称 -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <Button Margin="0,0,12,0" Padding="8,5" VerticalAlignment="Center"
+                            Click="BackBtn_Click" Content="← 返回" />
+                    <TextBlock x:Name="FileNameText" VerticalAlignment="Center"
+                               Style="{StaticResource BodyText}" Text="未命名标签" />
                 </StackPanel>
-            </ScrollViewer>
+
+                <!-- 中：图层与画布操作 -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
+                    <Button x:Name="UndoBtn" Padding="8,5" Margin="0,0,4,0"
+                            Click="UndoBtn_Click" Content="撤销" ToolTip="Ctrl+Z" />
+                    <Button x:Name="RedoBtn" Padding="8,5" Margin="0,0,4,0"
+                            Click="RedoBtn_Click" Content="重做" ToolTip="Ctrl+Y" />
+                    <Button x:Name="SelectAllBtn" Padding="8,5" Margin="0,0,4,0"
+                            Click="SelectAllBtn_Click" Content="全选" ToolTip="Ctrl+A" />
+                    <Button x:Name="DuplicateBtn" Padding="8,5" Margin="0,0,8,0"
+                            Click="DuplicateBtn_Click" Content="复制" />
+                    <TextBlock VerticalAlignment="Center" Style="{StaticResource CaptionText}" Text="|" Margin="0,0,8,0" />
+                    <Button x:Name="MoveUpBtn" Padding="8,5" Margin="0,0,4,0"
+                            Click="MoveUpBtn_Click" Content="上移层" />
+                    <Button x:Name="MoveDownBtn" Padding="8,5" Margin="0,0,8,0"
+                            Click="MoveDownBtn_Click" Content="下移层" />
+                    <TextBlock VerticalAlignment="Center" Style="{StaticResource CaptionText}" Text="|" Margin="0,0,8,0" />
+                    <Button x:Name="ToolbarDeleteBtn" Padding="8,5"
+                            Click="DeleteBtn_Click" Content="删除" ToolTip="Delete 键" />
+                </StackPanel>
+
+                <!-- 右：存为模板 / 浓度 / 份数 / 打印 -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <Button x:Name="SaveTemplateBtn" Padding="8,5" VerticalAlignment="Center" Margin="0,0,12,0"
+                            Click="SaveTemplateBtn_Click" Content="存为模板" />
+                    <TextBlock VerticalAlignment="Center" Style="{StaticResource CaptionText}" Text="浓度" Margin="0,0,4,0" />
+                    <ComboBox x:Name="ThicknessCombo" Width="52" VerticalAlignment="Center" Margin="0,0,12,0"
+                              SelectionChanged="ThicknessCombo_SelectionChanged">
+                        <ComboBoxItem Content="0" />
+                        <ComboBoxItem Content="1" />
+                        <ComboBoxItem Content="2" />
+                        <ComboBoxItem Content="3" />
+                        <ComboBoxItem Content="4" />
+                        <ComboBoxItem Content="5" />
+                        <ComboBoxItem Content="6" />
+                        <ComboBoxItem Content="7" />
+                    </ComboBox>
+                    <TextBlock VerticalAlignment="Center" Style="{StaticResource CaptionText}" Text="份数" Margin="0,0,4,0" />
+                    <TextBox x:Name="CopiesInput" Width="44" VerticalAlignment="Center" Padding="4,4" Margin="0,0,12,0"
+                             Text="1" />
+                    <Button x:Name="PrintBtn" Padding="20,6" VerticalAlignment="Center"
+                            Click="PrintBtn_Click" Content="打印" />
+                </StackPanel>
+            </Grid>
         </Border>
 
-        <!-- ═══ 右侧预览区 ═══ -->
-        <Grid Grid.Column="1" Margin="24">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
+        <!-- ═══ 第二行：标签规格 + 元素插入 + 缩放 ═══ -->
+        <Border Grid.Row="1"
+                Background="{DynamicResource Layer02Brush}"
+                BorderBrush="{DynamicResource ControlStrokeBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="12,5">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
 
-            <TextBlock Grid.Row="0" Style="{StaticResource SubtitleText}" Text="画布预览" Margin="0,0,0,12" />
+                <!-- 左：纸张规格 + 纸宽选择 -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <TextBlock x:Name="PaperSpecText" VerticalAlignment="Center"
+                               Style="{StaticResource CaptionText}" Margin="0,0,10,0" />
+                    <TextBlock VerticalAlignment="Center" Style="{StaticResource CaptionText}" Text="纸宽" Margin="0,0,4,0" />
+                    <ComboBox x:Name="PaperWidthCombo" Width="72" VerticalAlignment="Center"
+                              SelectionChanged="PaperWidth_SelectionChanged">
+                        <ComboBoxItem Content="50 mm" />
+                        <ComboBoxItem Content="51 mm" />
+                        <ComboBoxItem Content="52 mm" />
+                        <ComboBoxItem Content="53 mm" />
+                        <ComboBoxItem Content="54 mm" />
+                        <ComboBoxItem Content="55 mm" />
+                        <ComboBoxItem Content="56 mm" />
+                        <ComboBoxItem Content="57 mm" />
+                    </ComboBox>
+                </StackPanel>
 
-            <ScrollViewer Grid.Row="1"
-                          HorizontalScrollBarVisibility="Auto"
-                          VerticalScrollBarVisibility="Auto">
-                <Border x:Name="CanvasBorder"
-                        Background="White"
-                        BorderBrush="{DynamicResource ControlStrokeBrush}"
-                        BorderThickness="1"
-                        CornerRadius="4"
-                        HorizontalAlignment="Left"
-                        VerticalAlignment="Top">
-                    <Canvas x:Name="CanvasArea" />
-                </Border>
-            </ScrollViewer>
+                <!-- 中：插入元素 -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
+                    <Button x:Name="AddTextBtn" Padding="8,4" Margin="0,0,4,0"
+                            Click="AddTextBtn_Click" Content="＋ 文字" />
+                    <Button x:Name="AddImageBtn" Padding="8,4" Margin="0,0,4,0"
+                            Click="AddImageBtn_Click" Content="＋ 图片" />
+                    <Button x:Name="AddCodeBtn" Padding="8,4" Margin="0,0,4,0"
+                            Click="AddCodeBtn_Click" Content="＋ 条码" />
+                    <Button x:Name="AddFormulaBtn" Padding="8,4" Margin="0,0,4,0"
+                            Click="AddFormulaBtn_Click" Content="＋ 公式" />
+                    <Button x:Name="AddTableBtn" Padding="8,4"
+                            Click="AddTableBtn_Click" Content="＋ 表格" />
+                </StackPanel>
+
+                <!-- 右：缩放控制 -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <Button x:Name="ZoomOutBtn" Width="26" Height="24" Padding="0" VerticalAlignment="Center"
+                            Click="ZoomOutBtn_Click" Content="−" ToolTip="缩小" />
+                    <TextBlock x:Name="ZoomLabel" Width="52" VerticalAlignment="Center"
+                               HorizontalAlignment="Center" Style="{StaticResource BodyText}"
+                               Text="100%" Margin="4,0" />
+                    <Button x:Name="ZoomOneBtn" Width="38" Height="24" Padding="0" VerticalAlignment="Center" Margin="0,0,4,0"
+                            Click="ZoomOneBtn_Click" Content="1:1" ToolTip="还原比例" />
+                    <Button x:Name="ZoomInBtn" Width="26" Height="24" Padding="0" VerticalAlignment="Center"
+                            Click="ZoomInBtn_Click" Content="＋" ToolTip="放大" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ═══ 第三行：画布 + 右侧属性面板（可拖宽） ═══ -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="300" MinWidth="230" MaxWidth="560" />
+            </Grid.ColumnDefinitions>
+
+            <!-- 画布区（Word 文档区，纸张居中） -->
+            <Grid Grid.Column="0" Margin="24,16,16,16">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Style="{StaticResource SubtitleText}" Text="自定义打印" Margin="0,0,0,8" />
+                <TextBlock Grid.Row="0" Style="{StaticResource CaptionText}" Margin="0,4,0,0"
+                           HorizontalAlignment="Right" VerticalAlignment="Top"
+                           Text="拖拽移动 · 手柄缩放/旋转(Shift 吸附15°) · 空白框选 · Ctrl 多选 · 双击文字编辑" />
+
+                <ScrollViewer Grid.Row="1"
+                              HorizontalScrollBarVisibility="Auto"
+                              VerticalScrollBarVisibility="Auto">
+                    <Border x:Name="CanvasBorder"
+                            Background="White"
+                            BorderBrush="{DynamicResource ControlStrokeBrush}"
+                            BorderThickness="1"
+                            CornerRadius="4"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Top"
+                            Focusable="True"
+                            Cursor="Cross"
+                            MouseLeftButtonDown="Canvas_MouseLeftButtonDown"
+                            MouseMove="Canvas_MouseMove"
+                            MouseLeftButtonUp="Canvas_MouseLeftButtonUp"
+                            MouseLeave="Canvas_MouseLeave">
+                        <Grid>
+                            <!-- 元素显示层（不参与命中测试，鼠标事件统一走 CanvasBorder 的几何命中） -->
+                            <Canvas x:Name="CanvasArea" />
+                            <!-- 覆盖层：选中框 / 手柄 / 磁吸参考线 / 框选矩形 -->
+                            <Canvas x:Name="OverlayCanvas" IsHitTestVisible="False" />
+                        </Grid>
+                    </Border>
+                </ScrollViewer>
+            </Grid>
+
+            <!-- 分隔条：按住左右拖动调整属性面板宽度 -->
+            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch"
+                          Background="{DynamicResource ControlStrokeBrush}"
+                          ResizeBehavior="PreviousAndNext" ResizeDirection="Columns"
+                          ToolTip="按住左右拖动调整宽度" />
+
+            <!-- 右侧属性面板 -->
+            <Border Grid.Column="2"
+                    Background="{DynamicResource Layer02Brush}"
+                    BorderBrush="{DynamicResource ControlStrokeBrush}"
+                    BorderThickness="1,0,0,0"
+                    Padding="16">
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              Style="{StaticResource ThinScrollViewer}">
+                    <StackPanel>
+                        <!-- 元素列表 -->
+                        <TextBlock Style="{StaticResource CaptionText}" Text="元素列表" Margin="0,0,0,4" />
+                        <ListBox x:Name="ElementList" Height="110" Margin="0,0,0,12"
+                                 SelectionChanged="ElementList_SelectionChanged">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding DisplayName}" />
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+
+                        <!-- 选中元素属性 -->
+                        <Border x:Name="ElementProps" Visibility="Collapsed"
+                                BorderBrush="{DynamicResource ControlStrokeBrush}"
+                                BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CaptionText}" Text="选中元素属性" Margin="0,0,0,8" />
+
+                                <!-- 位置与尺寸 -->
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="8" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Style="{StaticResource CaptionText}" Text="X（点）" Margin="0,0,0,4" />
+                                        <TextBox x:Name="PosXInput" Padding="6,4" TextChanged="PosInput_TextChanged" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Style="{StaticResource CaptionText}" Text="Y（点）" Margin="0,0,0,4" />
+                                        <TextBox x:Name="PosYInput" Padding="6,4" TextChanged="PosInput_TextChanged" />
+                                    </StackPanel>
+                                </Grid>
+                                <Grid Margin="0,8,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="8" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Style="{StaticResource CaptionText}" Text="宽（点）" Margin="0,0,0,4" />
+                                        <TextBox x:Name="WidthInput" Padding="6,4" TextChanged="SizeInput_TextChanged" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Style="{StaticResource CaptionText}" Text="高（点）" Margin="0,0,0,4" />
+                                        <TextBox x:Name="HeightInput" Padding="6,4" TextChanged="SizeInput_TextChanged" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <!-- 旋转滑块 -->
+                                <TextBlock Style="{StaticResource CaptionText}" Text="旋转角度" Margin="0,12,0,4" />
+                                <StackPanel Orientation="Horizontal">
+                                    <Slider x:Name="RotationSlider" Minimum="0" Maximum="360" Value="0"
+                                            Width="150" TickFrequency="1" IsSnapToTickEnabled="True"
+                                            ValueChanged="RotationSlider_ValueChanged" />
+                                    <TextBlock x:Name="RotationValueLabel" Margin="8,0,0,0"
+                                               Style="{StaticResource BodyText}" Text="0°" />
+                                </StackPanel>
+
+                                <!-- 锁定 / 反色 -->
+                                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                    <CheckBox x:Name="LockCheck" Content="锁定" Margin="0,0,16,0"
+                                              Checked="ElementFlags_Changed" Unchecked="ElementFlags_Changed" />
+                                    <CheckBox x:Name="InvertCheck" Content="反色"
+                                              Checked="ElementFlags_Changed" Unchecked="ElementFlags_Changed" />
+                                </StackPanel>
+
+                                <!-- 文字元素专属 -->
+                                <StackPanel x:Name="TextProps" Visibility="Collapsed" Margin="0,12,0,0">
+                                    <TextBlock Style="{StaticResource CaptionText}" Text="文字内容" Margin="0,0,0,4" />
+                                    <TextBox x:Name="ElementText" Height="56" TextWrapping="Wrap"
+                                             AcceptsReturn="True" Padding="6,4"
+                                             TextChanged="ElementText_TextChanged" />
+
+                                    <TextBlock Style="{StaticResource CaptionText}" Text="字体" Margin="0,10,0,4" />
+                                    <ComboBox x:Name="FontFamilyCombo" SelectionChanged="FontFamily_SelectionChanged">
+                                        <ComboBoxItem Content="系统默认" Tag="" />
+                                        <ComboBoxItem Content="微软雅黑" Tag="Microsoft YaHei UI" />
+                                        <ComboBoxItem Content="宋体" Tag="SimSun" />
+                                        <ComboBoxItem Content="黑体" Tag="SimHei" />
+                                        <ComboBoxItem Content="楷体" Tag="KaiTi" />
+                                        <ComboBoxItem Content="仿宋" Tag="FangSong" />
+                                    </ComboBox>
+
+                                    <Grid Margin="0,10,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="8" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Style="{StaticResource CaptionText}" Text="字号" Margin="0,0,0,4" />
+                                            <Slider x:Name="ElementFontSize" Minimum="12" Maximum="48" Value="24"
+                                                    TickFrequency="1" IsSnapToTickEnabled="True"
+                                                    ValueChanged="ElementFontSize_ValueChanged" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Style="{StaticResource CaptionText}" Text="字重" Margin="0,0,0,4" />
+                                            <StackPanel Orientation="Horizontal">
+                                                <Slider x:Name="FontWeightSlider" Minimum="100" Maximum="900" Value="400"
+                                                        TickFrequency="100" IsSnapToTickEnabled="True" Width="80"
+                                                        ValueChanged="FontWeightSlider_ValueChanged" />
+                                                <TextBlock x:Name="FontWeightLabel" Margin="6,0,0,0"
+                                                           Style="{StaticResource BodyText}" Text="400" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <TextBlock Style="{StaticResource CaptionText}" Text="渲染模式" Margin="0,10,0,4" />
+                                    <ComboBox x:Name="EnhanceCombo" SelectionChanged="EnhanceCombo_SelectionChanged" />
+
+                                    <TextBlock Style="{StaticResource CaptionText}" Text="样式" Margin="0,10,0,4" />
+                                    <StackPanel Orientation="Horizontal">
+                                        <CheckBox x:Name="ItalicCheck" Content="斜体" Margin="0,0,12,0"
+                                                  Checked="StyleCheck_Changed" Unchecked="StyleCheck_Changed" />
+                                        <CheckBox x:Name="UnderlineCheck" Content="下划线" Margin="0,0,12,0"
+                                                  Checked="StyleCheck_Changed" Unchecked="StyleCheck_Changed" />
+                                        <CheckBox x:Name="VerticalCheck" Content="竖排"
+                                                  Checked="StyleCheck_Changed" Unchecked="StyleCheck_Changed" />
+                                    </StackPanel>
+
+                                    <TextBlock Style="{StaticResource CaptionText}" Text="对齐" Margin="0,10,0,4" />
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button x:Name="AlignLeftBtn" Padding="10,4" Margin="0,0,4,0"
+                                                Click="AlignTextBtn_Click" Content="左" Tag="Left" />
+                                        <Button x:Name="AlignCenterBtn" Padding="10,4" Margin="0,0,4,0"
+                                                Click="AlignTextBtn_Click" Content="中" Tag="Center" />
+                                        <Button x:Name="AlignRightBtn" Padding="10,4"
+                                                Click="AlignTextBtn_Click" Content="右" Tag="Right" />
+                                    </StackPanel>
+
+                                    <Grid Margin="0,10,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="8" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Style="{StaticResource CaptionText}" Text="字间距" Margin="0,0,0,4" />
+                                            <TextBox x:Name="LetterSpacingInput" Padding="6,4" Text="0"
+                                                     TextChanged="SpacingInput_TextChanged" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Style="{StaticResource CaptionText}" Text="行间距" Margin="0,0,0,4" />
+                                            <TextBox x:Name="LineSpacingInput" Padding="6,4" Text="6"
+                                                     TextChanged="SpacingInput_TextChanged" />
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+
+                                <!-- 公式元素专属 -->
+                                <StackPanel x:Name="FormulaProps" Visibility="Collapsed" Margin="0,12,0,0">
+                                    <TextBlock Style="{StaticResource CaptionText}" Text="LaTeX 公式" Margin="0,0,0,4" />
+                                    <TextBox x:Name="ElementFormula" Height="60" TextWrapping="Wrap"
+                                             AcceptsReturn="True" Padding="6,4"
+                                             TextChanged="ElementFormula_TextChanged" />
+                                    <TextBlock Style="{StaticResource CaptionText}" Text="示例: \frac{1}{2} 或 E=mc^2" Margin="0,4,0,4" />
+                                </StackPanel>
+
+                                <!-- 图片元素专属 -->
+                                <StackPanel x:Name="ImageProps" Visibility="Collapsed" Margin="0,12,0,0">
+                                    <TextBlock Style="{StaticResource CaptionText}" Text="抖动算法" Margin="0,0,0,4" />
+                                    <ComboBox x:Name="ImageDitherCombo" SelectionChanged="ImageDither_SelectionChanged" />
+                                    <TextBlock Style="{StaticResource CaptionText}" Text="阈值（仅无抖动时生效）" Margin="0,10,0,4" />
+                                    <StackPanel Orientation="Horizontal">
+                                        <Slider x:Name="ImageThresholdSlider" Minimum="0" Maximum="255" Value="128"
+                                                Width="150" TickFrequency="1" IsSnapToTickEnabled="True"
+                                                ValueChanged="ImageThresholdSlider_ValueChanged" />
+                                        <TextBlock x:Name="ImageThresholdLabel" Margin="8,0,0,0"
+                                                   Style="{StaticResource BodyText}" Text="128" />
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <!-- 条码元素专属 -->
+                                <StackPanel x:Name="CodeProps" Visibility="Collapsed" Margin="0,12,0,0">
+                                    <TextBlock Style="{StaticResource CaptionText}" Text="条码内容" Margin="0,0,0,4" />
+                                    <TextBox x:Name="CodeContentInput" Height="48" TextWrapping="Wrap"
+                                             AcceptsReturn="True" Padding="6,4"
+                                             TextChanged="CodeContent_TextChanged" />
+                                    <TextBlock Style="{StaticResource CaptionText}" Text="码制" Margin="0,10,0,4" />
+                                    <ComboBox x:Name="CodeTypeCombo" SelectionChanged="CodeType_SelectionChanged" />
+                                    <TextBlock x:Name="CodeTypeHint" Margin="0,4,0,0"
+                                               Style="{StaticResource CaptionText}" Text="" />
+                                </StackPanel>
+
+                                <!-- 表格元素专属 -->
+                                <StackPanel x:Name="TableProps" Visibility="Collapsed" Margin="0,12,0,0">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="8" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Style="{StaticResource CaptionText}" Text="行数" Margin="0,0,0,4" />
+                                            <TextBox x:Name="TableRowsInput" Padding="6,4" Text="3"
+                                                     TextChanged="TableSize_TextChanged" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Style="{StaticResource CaptionText}" Text="列数" Margin="0,0,0,4" />
+                                            <TextBox x:Name="TableColsInput" Padding="6,4" Text="3"
+                                                     TextChanged="TableSize_TextChanged" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <TextBlock Style="{StaticResource CaptionText}" Text="表格内容（逗号分列，换行分行）" Margin="0,10,0,4" />
+                                    <TextBox x:Name="TableDataInput" Height="70" TextWrapping="Wrap"
+                                             AcceptsReturn="True" Padding="6,4"
+                                             TextChanged="TableData_TextChanged" />
+                                    <TextBlock Style="{StaticResource CaptionText}" Text="列宽权重（逗号分隔，留空均分）" Margin="0,10,0,4" />
+                                    <TextBox x:Name="TableWeightsInput" Padding="6,4"
+                                             TextChanged="TableWeights_TextChanged" />
+                                    <TextBlock Style="{StaticResource CaptionText}" Text="字号" Margin="0,10,0,4" />
+                                    <StackPanel Orientation="Horizontal">
+                                        <Slider x:Name="TableFontSizeSlider" Minimum="8" Maximum="24" Value="14"
+                                                Width="150" TickFrequency="1" IsSnapToTickEnabled="True"
+                                                ValueChanged="TableFontSize_ValueChanged" />
+                                        <TextBlock x:Name="TableFontSizeLabel" Margin="8,0,0,0"
+                                                   Style="{StaticResource BodyText}" Text="14" />
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <!-- 多选对齐/分布（≥2 个选中时有效） -->
+                                <StackPanel x:Name="AlignProps" Visibility="Collapsed" Margin="0,12,0,0">
+                                    <TextBlock Style="{StaticResource CaptionText}" Text="对齐 / 分布（多选）" Margin="0,0,0,4" />
+                                    <WrapPanel>
+                                        <Button Padding="8,4" Margin="0,0,4,4" Click="AlignLeftBtn_Click" Content="左对齐" />
+                                        <Button Padding="8,4" Margin="0,0,4,4" Click="AlignHCenterBtn_Click" Content="水平居中" />
+                                        <Button Padding="8,4" Margin="0,0,4,4" Click="AlignRightBtn_Click" Content="右对齐" />
+                                        <Button Padding="8,4" Margin="0,0,4,4" Click="AlignTopBtn_Click" Content="顶对齐" />
+                                        <Button Padding="8,4" Margin="0,0,4,4" Click="AlignVCenterBtn_Click" Content="垂直居中" />
+                                        <Button Padding="8,4" Margin="0,0,4,4" Click="AlignBottomBtn_Click" Content="底对齐" />
+                                        <Button Padding="8,4" Margin="0,0,4,4" Click="DistributeHBtn_Click" Content="水平分布" />
+                                        <Button Padding="8,4" Margin="0,0,4,4" Click="DistributeVBtn_Click" Content="垂直分布" />
+                                    </WrapPanel>
+                                </StackPanel>
+
+                                <!-- 操作按钮 -->
+                                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                    <Button Padding="8,6" Margin="0,0,8,0"
+                                            Click="MoveUpBtn_Click" Content="上移层" />
+                                    <Button Padding="8,6" Margin="0,0,8,0"
+                                            Click="MoveDownBtn_Click" Content="下移层" />
+                                    <Button Padding="8,6"
+                                            Click="DeleteBtn_Click" Content="删除" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 画布最小长度 -->
+                        <TextBlock Style="{StaticResource CaptionText}" Text="最小长度（点）" Margin="0,0,0,4" />
+                        <TextBox x:Name="MinLengthInput" Padding="6,4" Text="200"
+                                 TextChanged="MinLengthInput_TextChanged" />
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
         </Grid>
     </Grid>
 </UserControl>

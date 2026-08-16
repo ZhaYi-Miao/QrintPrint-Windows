@@ -249,7 +249,7 @@
                 <StackPanel>
                     <TextBlock Style="{StaticResource BodyStrongText}" Text="QrintPrint" />
                     <TextBlock Margin="0,4,0,0" Style="{StaticResource CaptionText}"
-                               Text="错题小印 Windows 版 v1.1.1" />
+                               Text="错题小印 Windows 版 v1.1.2" />
                     <TextBlock Margin="0,8,0,0" Style="{StaticResource CaptionText}"
                                Text="基于 Qring 私有协议，支持文本、照片、条码、自定义画布打印" />
                     <TextBlock Margin="0,12,0,0" Style="{StaticResource CaptionText}"
@@ -270,6 +270,26 @@
                             QrintPrint-Web-Console（网页打印面板）
                         </Hyperlink>
                     </TextBlock>
+
+                    <!-- 检查更新 -->
+                    <TextBlock Style="{StaticResource CaptionText}" Text="检查更新" Margin="0,16,0,4" />
+                    <StackPanel Orientation="Horizontal">
+                        <Button x:Name="CheckUpdateBtn" Content="检查更新"
+                                Click="CheckUpdateBtn_Click" Padding="10,4" />
+                        <Button x:Name="DownloadUpdateBtn" Content="下载最新版"
+                                Click="DownloadUpdateBtn_Click" Padding="10,4" Margin="8,0,0,0"
+                                Visibility="Collapsed" />
+                    </StackPanel>
+                    <CheckBox x:Name="AutoCheckUpdateCheck" Content="自动检查更新（程序启动时检查，发现新版本自动提示）"
+                              Margin="0,8,0,0"
+                              Checked="AutoCheckUpdateCheck_Changed" Unchecked="AutoCheckUpdateCheck_Changed" />
+                    <CheckBox x:Name="UseProxyCheck" Content="使用系统代理（访问 GitHub 受限/403 时勾选）"
+                              Margin="0,8,0,0" IsChecked="True" />
+                    <ProgressBar x:Name="UpdateProgress" Height="6" Margin="0,8,0,0"
+                                 Visibility="Collapsed" Maximum="100" />
+                    <TextBlock x:Name="UpdateStatusText" Margin="0,8,0,0"
+                               Style="{StaticResource CaptionText}" TextWrapping="Wrap"
+                               Text="点击按钮检查 GitHub 最新版本" />
                 </StackPanel>
             </Border>
         </StackPanel>

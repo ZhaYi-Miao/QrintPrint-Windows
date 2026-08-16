@@ -95,7 +95,7 @@ public partial class HistoryPage : UserControl, IPage
             }
         }
 
-        HistoryList.ItemsSource = _history;
+        HistoryList.ItemsSource = _history.ToList();
     }
 
     private BitmapSource CreateDefaultThumbnail()

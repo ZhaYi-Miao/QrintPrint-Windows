@@ -180,4 +180,67 @@ public static class Compositor
             }
         }
     }
+
+    /// <summary>
+    /// 把 src 绕 (centerX, centerY) 旋转 angleDeg 度（顺时针，与 WPF RotateTransform 同向）后
+    /// 叠到 dst（或合并，语义与 <see cref="BlitBinary"/> 一致）。
+    ///
+    /// 目标像素反旋转回源坐标取样（最近邻）。遍历范围取「旋转后包围盒 ∩ 画布」，
+    /// 不用全图扫描。旋转只是打印正确性问题，最近邻的轻微锯齿可接受
+    /// （热敏机本身就是 1-bit 输出，且预览层用 WPF 渲染旋转，两处几何一致）。
+    /// </summary>
+    public static void BlitBinaryRotated(
+        byte[] dst, int dstW, int dstH,
+        byte[] src, int srcW, int srcH,
+        double centerX, double centerY, double angleDeg)
+    {
+        double rad = angleDeg * Math.PI / 180.0;
+        double cos = Math.Cos(rad);
+        double sin = Math.Sin(rad);
+        double hw = srcW / 2.0;
+        double hh = srcH / 2.0;
+
+        // 旋转后四角的 AABB（相对中心）
+        double minX = double.MaxValue, maxX = double.MinValue;
+        double minY = double.MaxValue, maxY = double.MinValue;
+        foreach (var (qx, qy) in RotateCorners(hw, hh, cos, sin))
+        {
+            minX = Math.Min(minX, qx); maxX = Math.Max(maxX, qx);
+            minY = Math.Min(minY, qy); maxY = Math.Max(maxY, qy);
+        }
+
+        int startX = Math.Max(0, (int)Math.Floor(centerX + minX));
+        int endX = Math.Min(dstW, (int)Math.Ceiling(centerX + maxX));
+        int startY = Math.Max(0, (int)Math.Floor(centerY + minY));
+        int endY = Math.Min(dstH, (int)Math.Ceiling(centerY + maxY));
+
+        for (int ty = startY; ty < endY; ty++)
+        {
+            double vy = ty - centerY;
+            int dstRow = ty * dstW;
+            for (int tx = startX; tx < endX; tx++)
+            {
+                double vx = tx - centerX;
+                // 反旋转回源坐标
+                double sx = vx * cos + vy * sin + hw;
+                double sy = -vx * sin + vy * cos + hh;
+                if (sx < 0 || sy < 0 || sx >= srcW || sy >= srcH) continue;
+                if (src[(int)sy * srcW + (int)sx] == 1)
+                {
+                    dst[dstRow + tx] = 1;
+                }
+            }
+        }
+    }
+
+    private static (double X, double Y)[] RotateCorners(double hw, double hh, double cos, double sin)
+    {
+        return new[]
+        {
+            (-hw * cos - -hh * sin, -hw * sin + -hh * cos),
+            ( hw * cos - -hh * sin,  hw * sin + -hh * cos),
+            (-hw * cos -  hh * sin, -hw * sin +  hh * cos),
+            ( hw * cos -  hh * sin,  hw * sin +  hh * cos),
+        };
+    }
 }

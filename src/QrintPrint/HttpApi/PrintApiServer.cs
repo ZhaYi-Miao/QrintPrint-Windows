@@ -356,6 +356,7 @@ public sealed class PrintApiServer : IDisposable
             Margin = root.GetPropInt("margin", 8),
             FormulaMode = root.GetPropBool("formulaMode", false),
             FormulaScale = root.GetPropInt("formulaScale", 100),
+            Enhance = TextEnhance.Parse(root.GetPropString("enhance")),
         };
 
         var (binary, w, h) = RenderTextContent(content, opt);
@@ -600,6 +601,7 @@ public sealed class PrintApiServer : IDisposable
             Margin = root.GetPropInt("margin", 8),
             FormulaMode = root.GetPropBool("formulaMode", false),
             FormulaScale = root.GetPropInt("formulaScale", 100),
+            Enhance = TextEnhance.Parse(root.GetPropString("enhance")),
         };
 
         var (binary, w, h) = RenderTextContent(content, opt);
@@ -1135,6 +1137,8 @@ public sealed class PrintApiServer : IDisposable
         public int Margin { get; init; } = 8;
         public bool FormulaMode { get; init; }
         public int FormulaScale { get; init; } = 100;
+        /// <summary>文字增强算法（浓度指令不生效的机器靠它提清晰度），默认不处理</summary>
+        public TextEnhanceMode Enhance { get; init; } = TextEnhanceMode.NONE;
     }
 
     /// <summary>按 $...$ 分割文本,识别公式段</summary>
@@ -1203,6 +1207,11 @@ public sealed class PrintApiServer : IDisposable
                 };
                 using var img = RasterEncoder.RenderTextToImageIn(text, localOpts, maxWidth);
                 var gray = RasterEncoder.ImageToGrayRaw(img);
+                // 文字增强：浓度指令不生效的机器靠软件端二值化前补偿清晰度
+                if (opt.Enhance != TextEnhanceMode.NONE)
+                {
+                    gray = TextEnhance.Apply(gray, opt.Enhance);
+                }
                 var binary = Dither.DitherToBinary(gray, DitherMode.NONE, RasterEncoder.THRESHOLD_TEXT);
                 rendered.Add((binary, gray.Width, gray.Height));
                 totalH += img.Height + opt.LineSpacing;
