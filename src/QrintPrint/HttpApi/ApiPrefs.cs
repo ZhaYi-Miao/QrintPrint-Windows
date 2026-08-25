@@ -1,5 +1,6 @@
 using System.IO;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 namespace QrintPrint.HttpApi;
@@ -24,6 +25,28 @@ public sealed class ApiKey
         Span<byte> bytes = stackalloc byte[18];
         RandomNumberGenerator.Fill(bytes);
         return Convert.ToHexString(bytes).ToLowerInvariant();
+    }
+
+    /// <summary>
+    /// 生成绑定当前电脑的稳定令牌：同一台电脑上始终固定（不随机跳变），
+    /// 即使配置丢失也会得到相同结果。格式与随机令牌一致（36 位 hex）。
+    /// </summary>
+    public static string GenerateStableToken()
+    {
+        string machineId;
+        try
+        {
+            using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Cryptography");
+            machineId = key?.GetValue("MachineGuid")?.ToString() ?? string.Empty;
+        }
+        catch
+        {
+            machineId = string.Empty;
+        }
+        if (string.IsNullOrWhiteSpace(machineId))
+            machineId = Environment.MachineName + Environment.UserName;
+        byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes("QrintPrint:stable-token:" + machineId));
+        return Convert.ToHexString(hash).ToLowerInvariant()[..36];
     }
 }
 
@@ -90,10 +113,10 @@ public static class ApiPrefs
             // 配置损坏时回退默认值
         }
 
-        // 完全重构后:始终保证至少一个管理员 Key
+        // 完全重构后:始终保证至少一个管理员 Key（token 按电脑特征稳定派生，配置丢失后不再随机跳变）
         if (Keys.Count == 0)
         {
-            Keys.Add(new ApiKey { Name = "管理员", IsAdmin = true });
+            Keys.Add(new ApiKey { Name = "管理员", IsAdmin = true, Token = ApiKey.GenerateStableToken() });
         }
         Save();
     }
@@ -138,7 +161,7 @@ public static class ApiPrefs
         Keys.Remove(key);
         if (Keys.Count == 0 || !Keys.Any(k => k.IsAdmin))
         {
-            Keys.Add(new ApiKey { Name = "管理员", IsAdmin = true });
+            Keys.Add(new ApiKey { Name = "管理员", IsAdmin = true, Token = ApiKey.GenerateStableToken() });
         }
         Save();
     }

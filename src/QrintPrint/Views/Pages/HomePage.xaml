@@ -217,6 +217,16 @@
                                        Text="文本渲染" />
                         </StackPanel>
                     </Button>
+                    <Button Style="{StaticResource QuickActionButton}" Padding="24,12" Margin="0,0,8,8"
+                            Click="QuickAction_Click" Tag="functionplot" MinHeight="48">
+                        <StackPanel Orientation="Horizontal" IsHitTestVisible="False">
+                            <TextBlock Style="{StaticResource BodyStrongText}"
+                                       Text="函数图像" />
+                            <TextBlock Margin="8,0,0,0" Style="{StaticResource CaptionText}"
+                                       VerticalAlignment="Center"
+                                       Text="多曲线" />
+                        </StackPanel>
+                    </Button>
                 </WrapPanel>
             </StackPanel>
         </Border>

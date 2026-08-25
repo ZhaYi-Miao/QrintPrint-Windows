@@ -134,6 +134,7 @@ public partial class HomePage : UserControl, IPage
                     "table" => new TablePrintPage(),
                     "schedule" => new SchedulePrintPage(),
                     "markdown" => new MarkdownPrintPage(),
+                    "functionplot" => new FunctionPlotPage(),
                     "vprint" => new VirtualPrinterSettingsPage(),
                     _ => null,
                 };

@@ -10,11 +10,13 @@
 // 协议层的光栅编码规则严格照搬 RasterEncoder.ets:
 //   每行 48 字节,MSB first(bit7 = 最左像素),置 1 = 黑。
 
+using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using QrintPrint.Logging;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
@@ -431,6 +433,10 @@ public static class RasterEncoder
     /// </summary>
     public static Image<Rgba32> RenderTextToImageIn(string text, TextRenderOptions options, int boxWidth)
     {
+        var sw = Stopwatch.StartNew();
+        bool trace = text.Length >= 500; // 超长文本才记录详细渲染日志,避免输入时刷屏
+        if (trace) AppLog.Write("Render", $"RenderTextToImageIn 开始 len={text.Length} boxW={boxWidth} font={options.FontSize}");
+
         // 至少留一列可画,否则 measureText 会在负宽度上死循环折行
         int width = Math.Max(1 + 2 * options.Margin, boxWidth);
         double usable = width - 2 * options.Margin;
@@ -475,6 +481,7 @@ public static class RasterEncoder
             lines = WrapText(text, options.FontFamily, options.FontSize,
                 options.Bold, options.Italic, options.FontWeight, options.LetterSpacing, usable);
         }
+        if (trace) AppLog.Write("Render", $"  [1] WrapText(折行测量) 耗时={sw.ElapsedMilliseconds}ms 行数={lines.Count}");
 
         // 下划线粗细随字号缩放,固定 1px 在大字号下会细得几乎打不出来
         int underlineWeight = Math.Max(1, (int)Math.Round(options.FontSize / 14));
@@ -533,9 +540,11 @@ public static class RasterEncoder
                 }
             }
         }
+        if (trace) AppLog.Write("Render", $"  [2] DrawingVisual 逐字绘制 耗时={sw.ElapsedMilliseconds}ms 行数={lines.Count}");
 
         var rtb = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
         rtb.Render(dv);
+        if (trace) AppLog.Write("Render", $"  [3] RenderTargetBitmap.Render 耗时={sw.ElapsedMilliseconds}ms 尺寸={width}x{height}");
 
         // RenderTargetBitmap → ImageSharp Rgba32,方便后续灰度化
         var pixels = new byte[width * height * 4];
@@ -555,6 +564,8 @@ public static class RasterEncoder
                 }
             }
         });
+        if (trace) AppLog.Write("Render", $"  [4] CopyPixels→ImageSharp 耗时={sw.ElapsedMilliseconds}ms 尺寸={width}x{height}");
+        if (trace) AppLog.Write("Render", $"RenderTextToImageIn 结束 总耗时={sw.ElapsedMilliseconds}ms");
         return img;
     }
 }

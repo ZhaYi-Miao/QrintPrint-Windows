@@ -161,12 +161,19 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" Style="{StaticResource CaptionText}"
                                    Text="访问令牌" VerticalAlignment="Center" />
-                        <TextBox Grid.Column="1" x:Name="SelectedKeyTokenBox" IsReadOnly="True"
+                        <TextBox Grid.Column="1" x:Name="SelectedKeyTokenBox"
                                  VerticalAlignment="Center"
                                  FontFamily="{StaticResource ContentFontFamily}" />
-                        <Button Grid.Column="2" Margin="8,0,0,0" Padding="10,4"
-                                Content="复制" Click="CopyTokenBtn_Click" />
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="8,0,0,0">
+                            <Button Padding="10,4" Content="复制"
+                                    Click="CopyTokenBtn_Click" />
+                            <Button Margin="8,0,0,0" Padding="10,4"
+                                    Content="保存令牌" Click="SaveTokenBtn_Click" />
+                        </StackPanel>
                     </Grid>
+                    <TextBlock Margin="0,4,0,0" Style="{StaticResource CaptionText}"
+                               TextWrapping="Wrap"
+                               Text="令牌保持固定不变（按电脑特征稳定派生，配置丢失也不改变）。如需自定义，直接修改后点“保存令牌”即可。" />
 
                     <TextBlock Margin="0,12,0,4" Style="{StaticResource CaptionText}"
                                Text="接口权限（管理员 Key 自动拥有全部；普通 Key 仅可访问勾选的接口）" />
@@ -247,9 +254,9 @@
                     BorderBrush="{DynamicResource ControlStrokeBrush}"
                     BorderThickness="1" CornerRadius="8" Padding="16">
                 <StackPanel>
-                    <TextBlock Style="{StaticResource BodyStrongText}" Text="QrintPrint" />
+                    <TextBlock Style="{StaticResource BodyStrongText}" Text="热印 ThermoPrint" />
                     <TextBlock Margin="0,4,0,0" Style="{StaticResource CaptionText}"
-                               Text="错题小印 Windows 版 v1.1.2" />
+                               Text="错题小印 Windows 版 v1.1.3" />
                     <TextBlock Margin="0,8,0,0" Style="{StaticResource CaptionText}"
                                Text="基于 Qring 私有协议，支持文本、照片、条码、自定义画布打印" />
                     <TextBlock Margin="0,12,0,0" Style="{StaticResource CaptionText}"

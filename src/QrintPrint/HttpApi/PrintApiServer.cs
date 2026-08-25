@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
@@ -238,6 +239,9 @@ public sealed class PrintApiServer : IDisposable
                 case ("POST", "/api/print/schedule"):
                     await HandlePrintScheduleAsync(stream, body);
                     break;
+                case ("POST", "/api/print/functionplot"):
+                    await HandlePrintFunctionPlotAsync(stream, body, preview: false);
+                    break;
                 case ("POST", "/api/preview/text"):
                     await HandlePreviewTextAsync(stream, body);
                     break;
@@ -255,6 +259,9 @@ public sealed class PrintApiServer : IDisposable
                     break;
                 case ("POST", "/api/preview/schedule"):
                     await HandlePreviewScheduleAsync(stream, body);
+                    break;
+                case ("POST", "/api/preview/functionplot"):
+                    await HandlePrintFunctionPlotAsync(stream, body, preview: true);
                     break;
                 default:
                     AppLog.Write("API", $"未知接口: {method} {path}");
@@ -700,6 +707,91 @@ public sealed class PrintApiServer : IDisposable
 
         string result = await PrintBinaryAsync(canvas, QringProtocol.WIDTH_DOTS, canvasH, null,
             "Markdown 打印", $"Markdown: {TrimSummary(content)}");
+        if (result is null)
+        {
+            await WriteJsonAsync(stream, new { ok = true, message = "打印成功" });
+        }
+        else
+        {
+            await WriteErrorAsync(stream, 500, result);
+        }
+    }
+
+    // ── 函数图像 ──────────────────────────────────────────
+
+    private async Task HandlePrintFunctionPlotAsync(Stream stream, byte[] body, bool preview)
+    {
+        using var doc = JsonDocument.Parse(body);
+        var root = doc.RootElement;
+
+        var functions = new List<string>();
+        if (root.TryGetProperty("functions", out var arr) && arr.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in arr.EnumerateArray())
+            {
+                if (item.ValueKind != JsonValueKind.String) continue;
+                string s = item.GetString()?.Trim() ?? "";
+                if (s.Length > 0) functions.Add(s);
+            }
+        }
+        if (functions.Count == 0)
+        {
+            await WriteErrorAsync(stream, 400, "参数 functions 需要至少一个函数表达式");
+            return;
+        }
+
+        double xMin = root.GetPropDouble("xMin", -10);
+        double xMax = root.GetPropDouble("xMax", 10);
+
+        double? yMin = null, yMax = null;
+        if (root.TryGetProperty("yMin", out var yv1) && yv1.ValueKind == JsonValueKind.Number)
+            yMin = yv1.GetDouble();
+        if (root.TryGetProperty("yMax", out var yv2) && yv2.ValueKind == JsonValueKind.Number)
+            yMax = yv2.GetDouble();
+
+        // 标记点(可选): [{name:"A", x:1.57, y:1.0}, ...]
+        var points = new List<PlotPoint>();
+        if (root.TryGetProperty("points", out var ptsArr) && ptsArr.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in ptsArr.EnumerateArray())
+            {
+                string? pname = item.TryGetProperty("name", out var pn) && pn.ValueKind == JsonValueKind.String
+                    ? pn.GetString() : null;
+                double? ppx = item.TryGetProperty("x", out var pxv) && pxv.ValueKind == JsonValueKind.Number ? pxv.GetDouble() : null;
+                double? ppy = item.TryGetProperty("y", out var pyv) && pyv.ValueKind == JsonValueKind.Number ? pyv.GetDouble() : null;
+                if (ppx.HasValue && ppy.HasValue)
+                    points.Add(new PlotPoint { Name = pname ?? "", X = ppx.Value, Y = ppy.Value });
+            }
+        }
+
+        var options = new FunctionPlotOptions
+        {
+            Expressions = functions,
+            XMin = xMin,
+            XMax = xMax,
+            YMin = yMin,
+            YMax = yMax,
+            ShowGrid = root.GetPropBool("grid", true),
+            ShowLegend = root.GetPropBool("legend", true),
+            Title = root.GetPropString("title"),
+            Points = points.Count > 0 ? points : null,
+        };
+
+        var (canvas, w, h, error) = FunctionPlotRenderer.Render(options);
+        if (canvas is null)
+        {
+            await WriteErrorAsync(stream, 400, error ?? "函数图像渲染失败");
+            return;
+        }
+
+        if (preview)
+        {
+            await WritePreviewAsync(stream, canvas, w, h);
+            return;
+        }
+
+        string result = await PrintBinaryAsync(canvas, w, h, null,
+            "函数图像", $"函数: {string.Join("、", functions)}");
         if (result is null)
         {
             await WriteJsonAsync(stream, new { ok = true, message = "打印成功" });
@@ -1171,6 +1263,9 @@ public sealed class PrintApiServer : IDisposable
     /// <summary>把纯文本/公式内容渲染成 1-bit 光栅（供 HTTP 服务与虚拟打印机接收端共用）</summary>
     internal static (byte[] Binary, int W, int H) RenderTextContent(string content, TextPrintOptions opt)
     {
+        var sw = Stopwatch.StartNew();
+        bool trace = content.Length >= 500;
+        if (trace) AppLog.Write("Render", $"RenderTextContent 开始 chars={content.Length} formula={opt.FormulaMode} margin={opt.Margin}");
         int maxWidth = QringProtocol.WIDTH_DOTS - 2 * opt.Margin;
         var segments = ParseTextSegments(content, opt.FormulaMode);
 
@@ -1216,6 +1311,7 @@ public sealed class PrintApiServer : IDisposable
                 rendered.Add((binary, gray.Width, gray.Height));
                 totalH += img.Height + opt.LineSpacing;
             }
+            if (trace) AppLog.Write("Render", $"  段[{rendered.Count - 1}] {(isFormula ? "公式" : "文本")} len={text.Length} 耗时={sw.ElapsedMilliseconds}ms");
         }
 
         if (totalH <= 0) return (Array.Empty<byte>(), 0, 0);
@@ -1223,6 +1319,7 @@ public sealed class PrintApiServer : IDisposable
         int canvasW = QringProtocol.WIDTH_DOTS;
         int canvasH = totalH;
         var canvas = Compositor.CreateBinaryCanvas(canvasW, canvasH);
+        if (trace) AppLog.Write("Render", $"  Canvas 创建 耗时={sw.ElapsedMilliseconds}ms 尺寸={canvasW}x{canvasH}");
 
         int y = 0;
         foreach (var (binary, w, h) in rendered)
@@ -1230,7 +1327,8 @@ public sealed class PrintApiServer : IDisposable
             Compositor.BlitBinary(canvas, canvasW, canvasH, binary, w, h, opt.Margin, y);
             y += h + opt.LineSpacing;
         }
-
+        if (trace) AppLog.Write("Render", $"  Blit(拼接) 耗时={sw.ElapsedMilliseconds}ms");
+        if (trace) AppLog.Write("Render", $"RenderTextContent 结束 总耗时={sw.ElapsedMilliseconds}ms 画布={canvasW}x{canvasH}");
         return (canvas, canvasW, canvasH);
     }
 
@@ -1504,7 +1602,7 @@ public sealed class PrintApiServer : IDisposable
             else if (getImage(seg) is { Length: > 0 } imageBytes)
             {
                 // 内嵌图片:走图片二值化管线,阈值可调
-                var (ib, iw, ih) = DocRenderHelper.RenderEmbeddedImage(imageBytes, maxWidth, imageThreshold);
+                var (ib, iw, ih) = DocRenderHelper.RenderEmbeddedImage(imageBytes, maxWidth, DitherMode.NONE, imageThreshold);
                 if (ib.Length == 0) continue;
                 rendered.Add((ib, iw, ih, false));
                 totalH += ih + opt.LineSpacing;
@@ -1751,6 +1849,9 @@ internal static class ApiJsonExtensions
 
     public static int GetPropInt(this JsonElement root, string name, int fallback) =>
         root.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetInt32() : fallback;
+
+    public static double GetPropDouble(this JsonElement root, string name, double fallback) =>
+        root.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetDouble() : fallback;
 
     public static bool GetPropBool(this JsonElement root, string name, bool fallback) =>
         root.TryGetProperty(name, out var v) ? v.GetBoolean() : fallback;

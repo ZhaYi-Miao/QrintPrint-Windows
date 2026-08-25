@@ -1,6 +1,6 @@
-# QrintPrint - 错题小印 Windows 版
+# 热印 ThermoPrint - 错题小印 Windows 版
 
-基于 Qring 私有蓝牙协议的热敏打印机桌面客户端，支持文本、图片、条码、Word 文档、LaTeX 公式及自定义画布打印。
+基于 Qring 私有蓝牙协议的热敏打印机桌面客户端，支持文本、图片、条码、Word 文档、LaTeX 公式、函数图像及自定义画布打印。
 
 ## 功能
 
@@ -110,7 +110,7 @@ ZhaYi & DeepSeek
 
 ## 致谢
 
-本项目站在众多开源前辈的肩膀上 —— **没有这些项目，就没有 QrintPrint**。在此向它们致以最诚挚的敬意：
+本项目站在众多开源前辈的肩膀上 —— **没有这些项目，就没有热印 ThermoPrint**。在此向它们致以最诚挚的敬意：
 
 - **[Thisko/QrintPrint](https://github.com/Thisko/QrintPrint)** —— **错题小印开源的先行者与开创者**
 - [lztttt/QrintPrint-Android](https://github.com/lztttt/QrintPrint-Android) —— Android 原生版

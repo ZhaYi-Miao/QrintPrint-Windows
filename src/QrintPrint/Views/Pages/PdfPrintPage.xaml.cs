@@ -329,7 +329,7 @@ public partial class PdfPrintPage : UserControl, IPage
                     if (seg.ImageBytes is { Length: > 0 })
                     {
                         // 内嵌图片:走图片二值化管线,阈值可调
-                        var (ib, iw, ih) = DocRenderHelper.RenderEmbeddedImage(seg.ImageBytes, maxWidth, imageThreshold);
+                        var (ib, iw, ih) = DocRenderHelper.RenderEmbeddedImage(seg.ImageBytes, maxWidth, DitherMode.NONE, imageThreshold);
                         if (ib.Length == 0) continue;
                         renderedSegments.Add((ib, iw, ih));
                         totalHeight += ih + textOptions.LineSpacing;

@@ -8,6 +8,7 @@ using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
 using DocumentFormat.OpenXml.Drawing.Wordprocessing;
 using QrintPrint.Bluetooth;
+using QrintPrint.Helpers;
 using QrintPrint.HttpApi;
 using QrintPrint.Models;
 using SixLabors.ImageSharp;
@@ -40,6 +41,49 @@ public partial class WordPrintPage : UserControl, IPage
     public WordPrintPage()
     {
         InitializeComponent();
+        InitImageDitherCombo();
+    }
+
+    /// <summary>初始化图片抖动下拉（无/Floyd/Atkinson，与照片打印一致）</summary>
+    private void InitImageDitherCombo()
+    {
+        foreach (var opt in Dither.Options)
+        {
+            ImageDitherCombo.Items.Add(new ComboBoxItem { Content = opt.Label, Tag = opt.Mode });
+        }
+        ImageDitherCombo.SelectedIndex = 0; // 无
+        UpdateThresholdPanelVisibility();
+    }
+
+    private void ImageDither_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        UpdateThresholdPanelVisibility();
+        _ = UpdatePreviewAsync();
+    }
+
+    /// <summary>阈值滑块仅"无"抖动模式生效（与照片打印一致）</summary>
+    private void UpdateThresholdPanelVisibility()
+    {
+        if (ImageThresholdPanel is null) return;
+        ImageThresholdPanel.Visibility = ImageDitherCombo.SelectedItem is ComboBoxItem { Tag: DitherMode m } && m == DitherMode.NONE
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    private DitherMode SelectedDitherMode()
+        => ImageDitherCombo.SelectedItem is ComboBoxItem { Tag: DitherMode m } ? m : DitherMode.NONE;
+
+    // ── 加载提示 ──────────────────────────────────────────────
+
+    private void ShowLoading(string text)
+    {
+        LoadingText.Text = text;
+        LoadingOverlay.Visibility = Visibility.Visible;
+    }
+
+    private void HideLoading()
+    {
+        LoadingOverlay.Visibility = Visibility.Collapsed;
     }
 
     private void BackBtn_Click(object sender, RoutedEventArgs e)
@@ -71,12 +115,15 @@ public partial class WordPrintPage : UserControl, IPage
 
         // 长文档解析/渲染耗时,放入后台线程执行,避免 UI 卡死
         int version = ++_renderVersion;
+        ShowLoading("正在解析文档...");
         try
         {
             DocInfo.Visibility = Visibility.Visible;
             FileNameText.Text = System.IO.Path.GetFileName(_docxPath);
+            ModeText.Text = "";
 
-            var segments = await Task.Run(() => ParseDocx(System.IO.File.ReadAllBytes(_docxPath!)));
+            byte[] docxData = File.ReadAllBytes(_docxPath!);
+            var segments = await Task.Run(() => ParseDocx(docxData));
             if (version != _renderVersion) return; // 期间已重新解析,丢弃过期结果
 
             _segments = segments;
@@ -85,10 +132,40 @@ public partial class WordPrintPage : UserControl, IPage
             int tableCount = _segments.Count(s => s.IsTable);
             PageCountText.Text = $"共 {_segments.Count} 个段落段 · {formulaCount} 个公式 · {imageCount} 个图片 · {tableCount} 个表格";
 
+            // 优先格式保真：页宽已设为 50~57mm 且本机有 Word/WPS → 转 PDF 1:1 渲染（保留全部格式）
+            _fidelityMode = false;
+            if (WordToPdfConverter.DetectConverter() is not null)
+            {
+                ShowLoading("正在用 Word 渲染完整格式（首次较慢）...");
+            }
+            bool fidelityOk = await TryFidelityModeAsync(docxData);
+            if (version != _renderVersion) return;
+
+            if (!fidelityOk)
+            {
+                double? pageWidthMm = GetDocxPageWidthMm(docxData);
+                if (WordToPdfConverter.DetectConverter() is null)
+                {
+                    ModeText.Text = "未检测到 Word/WPS，已按纯文本解析（格式不保留）";
+                }
+                else if (pageWidthMm is < 45 or > 62)
+                {
+                    ModeText.Text = pageWidthMm is { } pw
+                        ? $"页面宽度 {pw:F0}mm 超出打印纸范围（50~57mm），已按纯文本解析。如需格式保真，请把 Word 页面宽度设为 50~57mm"
+                        : "无法读取页面宽度，已按纯文本解析。如需格式保真，请把 Word 页面宽度设为 50~57mm";
+                }
+                else
+                {
+                    ModeText.Text = "格式保真渲染失败，已按纯文本解析";
+                }
+            }
+
             await UpdatePreviewAsync();
+            HideLoading();
         }
         catch (Exception ex)
         {
+            HideLoading();
             if (version != _renderVersion) return;
             MessageBox.Show($"文档解析失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
         }
@@ -275,6 +352,14 @@ public partial class WordPrintPage : UserControl, IPage
 
     private async Task UpdatePreviewAsync()
     {
+        // 格式保真模式：格式由 Word 渲染固定，字号/行距等滑杆不适用，直接显示保真画布
+        if (_fidelityMode && _printCanvas is { Length: > 0 })
+        {
+            PreviewImage.Source = RasterEncoder.BinaryToPreviewBitmap(
+                _printCanvas, _printCanvasW, _printCanvasH, transparentWhite: false);
+            return;
+        }
+
         if (_segments.Count == 0)
         {
             PreviewImage.Source = null;
@@ -285,6 +370,7 @@ public partial class WordPrintPage : UserControl, IPage
         int margin = (int)MarginSlider.Value;
         int maxWidth = QringProtocol.WIDTH_DOTS - 2 * margin;
         int imageThreshold = (int)ImageThresholdSlider.Value;
+        DitherMode ditherMode = SelectedDitherMode();
         var textOptions = new RasterEncoder.TextRenderOptions
         {
             FontSize = (int)FontSizeSlider.Value,
@@ -325,8 +411,8 @@ public partial class WordPrintPage : UserControl, IPage
                     }
                     else if (seg.IsImage && seg.ImageBytes is { Length: > 0 })
                     {
-                        // 内嵌图片:走图片二值化管线,阈值可调
-                        var (ib, iw, ih) = DocRenderHelper.RenderEmbeddedImage(seg.ImageBytes, maxWidth, imageThreshold);
+                        // 内嵌图片:走图片二值化管线,抖动模式 + 阈值可调
+                        var (ib, iw, ih) = DocRenderHelper.RenderEmbeddedImage(seg.ImageBytes, maxWidth, ditherMode, imageThreshold);
                         if (ib.Length == 0) continue;
                         renderedSegments.Add((ib, iw, ih, false));
                         totalHeight += ih + textOptions.LineSpacing;
@@ -380,6 +466,70 @@ public partial class WordPrintPage : UserControl, IPage
     private int _renderVersion; // 渲染版本号:丢弃过期预览结果
     private byte[]? _printCanvas;
     private int _printCanvasW, _printCanvasH;
+
+    // ── 格式保真模式（Word/WPS 转 PDF → 1:1 渲染裁切，保留全部格式） ──
+    private bool _fidelityMode;
+
+    /// <summary>读取 docx 页面宽度（mm）。取第一个分节符的页宽，失败返回 null</summary>
+    internal static double? GetDocxPageWidthMm(byte[] docxData)
+    {
+        try
+        {
+            using var ms = new MemoryStream(docxData);
+            using var doc = WordprocessingDocument.Open(ms, false);
+            var sectPr = doc.MainDocumentPart?.Document?.Body?.Descendants<SectionProperties>().FirstOrDefault();
+            var pgSz = sectPr?.Descendants<PageSize>().FirstOrDefault();
+            if (pgSz?.Width?.Value is { } w && w > 0)
+            {
+                // 单位 twips(1/1440 英寸)，换算为 mm
+                return w / 1440.0 * 25.4;
+            }
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 尝试格式保真模式：页宽在 45~62mm（50/57 纸 + 容差）且本机有 Word/WPS 时，
+    /// 转 PDF → 1:1 渲染页宽 → 居中裁出 48mm 打印区。成功返回 true 并填好打印缓存。
+    /// </summary>
+    private async Task<bool> TryFidelityModeAsync(byte[] docxData)
+    {
+        double? pageWidthMm = await Task.Run(() => GetDocxPageWidthMm(docxData));
+        if (pageWidthMm is null or < 45 or > 62) return false;
+        if (WordToPdfConverter.DetectConverter() is not { } engine) return false;
+
+        try
+        {
+            string pdfPath = System.IO.Path.Combine(
+                System.IO.Path.GetTempPath(), $"qrint_{Guid.NewGuid():N}.pdf");
+            bool convOk = await Task.Run(() => WordToPdfConverter.TryConvert(_docxPath!, pdfPath, out _, out _));
+            if (!convOk) return false;
+
+            var pdfBytes = File.ReadAllBytes(pdfPath);
+            File.Delete(pdfPath);
+
+            int pageWidthDots = (int)Math.Round(pageWidthMm.Value * 8);
+            int threshold = (int)ImageThresholdSlider.Value;
+            var (binary, w, h) = await Task.Run(() => DocRenderHelper.RenderPdfCropPages(
+                pdfBytes, pageWidthDots, QringProtocol.WIDTH_DOTS, threshold, pageSpacing: 6));
+            if (binary.Length == 0) return false;
+
+            _fidelityMode = true;
+            _printCanvas = binary;
+            _printCanvasW = w;
+            _printCanvasH = h;
+            ModeText.Text = $"格式保真：{engine} 渲染 · 页宽 {pageWidthMm.Value:F0}mm，超出 48mm 打印头部分已裁掉";
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
 
     // ── 打印 ─────────────────────────────────────────────────
 

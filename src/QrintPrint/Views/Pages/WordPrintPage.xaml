@@ -38,6 +38,8 @@
                             <TextBlock x:Name="FileNameText" Style="{StaticResource BodyText}" TextWrapping="Wrap" />
                             <TextBlock x:Name="PageCountText" Margin="0,4,0,0"
                                        Style="{StaticResource CaptionText}" />
+                            <TextBlock x:Name="ModeText" Margin="0,4,0,0" TextWrapping="Wrap"
+                                       Style="{StaticResource CaptionText}" Foreground="#D33A2B" />
                         </StackPanel>
                     </Border>
 
@@ -80,14 +82,20 @@
                                    Style="{StaticResource BodyText}" Text="8" />
                     </StackPanel>
 
-                    <!-- 图片阈值（仅对文档内嵌图片生效，与照片打印一致） -->
-                    <TextBlock Style="{StaticResource CaptionText}" Text="图片阈值" Margin="0,16,0,4" />
-                    <StackPanel Orientation="Horizontal">
-                        <Slider x:Name="ImageThresholdSlider" Minimum="0" Maximum="255" Value="128"
-                                Width="200" TickFrequency="1" IsSnapToTickEnabled="True"
-                                ValueChanged="ImageThresholdSlider_ValueChanged" />
-                        <TextBlock x:Name="ImageThresholdLabel" Margin="8,0,0,0"
-                                   Style="{StaticResource BodyText}" Text="128" />
+                    <!-- 文档内嵌图片:抖动算法（与照片打印一致） -->
+                    <TextBlock Style="{StaticResource CaptionText}" Text="图片抖动" Margin="0,16,0,4" />
+                    <ComboBox x:Name="ImageDitherCombo" SelectionChanged="ImageDither_SelectionChanged" />
+
+                    <!-- 图片阈值（仅"无"抖动时生效，与照片打印一致） -->
+                    <StackPanel x:Name="ImageThresholdPanel">
+                        <TextBlock Style="{StaticResource CaptionText}" Text="图片阈值" Margin="0,12,0,4" />
+                        <StackPanel Orientation="Horizontal">
+                            <Slider x:Name="ImageThresholdSlider" Minimum="0" Maximum="255" Value="128"
+                                    Width="200" TickFrequency="1" IsSnapToTickEnabled="True"
+                                    ValueChanged="ImageThresholdSlider_ValueChanged" />
+                            <TextBlock x:Name="ImageThresholdLabel" Margin="8,0,0,0"
+                                       Style="{StaticResource BodyText}" Text="128" />
+                        </StackPanel>
                     </StackPanel>
 
                     <!-- 打印按钮 -->
@@ -108,19 +116,31 @@
 
             <TextBlock Grid.Row="0" Style="{StaticResource SubtitleText}" Text="实时预览" Margin="0,0,0,12" />
 
-            <ScrollViewer Grid.Row="1"
-                          HorizontalScrollBarVisibility="Auto"
-                          VerticalScrollBarVisibility="Auto">
-                <Border x:Name="PreviewBorder"
-                        Background="White"
-                        BorderBrush="{DynamicResource ControlStrokeBrush}"
-                        BorderThickness="1"
-                        CornerRadius="4"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Top">
-                    <Image x:Name="PreviewImage" Stretch="None" />
+            <Grid Grid.Row="1">
+                <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                              VerticalScrollBarVisibility="Auto">
+                    <Border x:Name="PreviewBorder"
+                            Background="White"
+                            BorderBrush="{DynamicResource ControlStrokeBrush}"
+                            BorderThickness="1"
+                            CornerRadius="4"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Top">
+                        <Image x:Name="PreviewImage" Stretch="None" />
+                    </Border>
+                </ScrollViewer>
+
+                <!-- 加载提示：文档解析/格式保真渲染期间显示，避免用户以为程序卡死 -->
+                <Border x:Name="LoadingOverlay" Background="#CCFFFFFF" Visibility="Collapsed">
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <ProgressBar Width="180" Height="10" IsIndeterminate="True" />
+                        <TextBlock x:Name="LoadingText" Margin="0,10,0,0"
+                                   HorizontalAlignment="Center"
+                                   Style="{StaticResource BodyText}"
+                                   Text="正在解析文档，请稍候..." />
+                    </StackPanel>
                 </Border>
-            </ScrollViewer>
+            </Grid>
         </Grid>
     </Grid>
 </UserControl>

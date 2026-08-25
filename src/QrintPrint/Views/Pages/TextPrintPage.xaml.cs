@@ -1,8 +1,11 @@
+using System.Diagnostics;
+using System.Linq;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
 using QrintPrint.Bluetooth;
+using QrintPrint.Logging;
 using QrintPrint.Models;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
@@ -152,6 +155,10 @@ public partial class TextPrintPage : UserControl, IPage
     /// <summary>渲染所有段到统一画布,返回二值数据</summary>
     private (byte[] Binary, int W, int H) RenderAllSegments(List<TextSegment> segments, int maxWidth, int margin)
     {
+        var sw = Stopwatch.StartNew();
+        int totalChars = segments.Sum(s => s.Text.Length);
+        bool trace = totalChars >= 500;
+        if (trace) AppLog.Write("Render", $"RenderAllSegments 开始 segs={segments.Count} chars={totalChars} maxW={maxWidth} margin={margin}");
         var textOptions = new RasterEncoder.TextRenderOptions
         {
             FontSize = (int)FontSizeSlider.Value,
@@ -210,6 +217,7 @@ public partial class TextPrintPage : UserControl, IPage
                 rendered.Add((binary, gray.Width, gray.Height));
                 totalH += img.Height + textOptions.LineSpacing;
             }
+            if (trace) AppLog.Write("Render", $"  段[{rendered.Count - 1}] {(seg.IsFormula ? "公式" : "文本")} len={seg.Text.Length} 耗时={sw.ElapsedMilliseconds}ms");
         }
 
         if (totalH <= 0) return (Array.Empty<byte>(), 0, 0);
@@ -217,6 +225,7 @@ public partial class TextPrintPage : UserControl, IPage
         int canvasW = QringProtocol.WIDTH_DOTS;
         int canvasH = totalH;
         var canvas = Compositor.CreateBinaryCanvas(canvasW, canvasH);
+        if (trace) AppLog.Write("Render", $"  Canvas 创建 耗时={sw.ElapsedMilliseconds}ms 尺寸={canvasW}x{canvasH}");
 
         int y = 0;
         foreach (var (binary, w, h) in rendered)
@@ -224,7 +233,8 @@ public partial class TextPrintPage : UserControl, IPage
             Compositor.BlitBinary(canvas, canvasW, canvasH, binary, w, h, margin, y);
             y += h + textOptions.LineSpacing;
         }
-
+        if (trace) AppLog.Write("Render", $"  Blit(拼接) 耗时={sw.ElapsedMilliseconds}ms");
+        if (trace) AppLog.Write("Render", $"RenderAllSegments 结束 总耗时={sw.ElapsedMilliseconds}ms 画布={canvasW}x{canvasH}");
         return (canvas, canvasW, canvasH);
     }
 

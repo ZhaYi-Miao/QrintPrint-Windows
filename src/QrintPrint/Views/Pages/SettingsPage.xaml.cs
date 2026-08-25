@@ -113,6 +113,7 @@ public partial class SettingsPage : UserControl, IPage
         ("/api/print/pdf", "PDF 打印"),
         ("/api/print/table", "表格打印"),
         ("/api/print/schedule", "课程表打印"),
+        ("/api/print/functionplot", "函数图像打印"),
     };
 
     private void UserControl_Loaded(object sender, RoutedEventArgs e)
@@ -284,6 +285,33 @@ public partial class SettingsPage : UserControl, IPage
         {
             // 剪贴板被占用时忽略
         }
+    }
+
+    /// <summary>手动修改选中 Key 的令牌并保存（保存后固定不变）</summary>
+    private void SaveTokenBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (ApiKeyList.SelectedItem is not ApiKey key) return;
+
+        string token = SelectedKeyTokenBox.Text.Trim();
+        if (string.IsNullOrEmpty(token))
+        {
+            MessageBox.Show("令牌不能为空。", "提示",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            RefreshKeyDetail(key);
+            return;
+        }
+        if (token.Length > 64 || token.Any(char.IsWhiteSpace))
+        {
+            MessageBox.Show("令牌应为 1-64 个字符且不含空白。", "提示",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            RefreshKeyDetail(key);
+            return;
+        }
+
+        key.Token = token;
+        ApiPrefs.Save();
+        RefreshKeyList();
+        ApiKeyList.SelectedItem = key;
     }
 
     private void DeleteKeyBtn_Click(object sender, RoutedEventArgs e)
